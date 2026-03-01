@@ -176,10 +176,13 @@ def _run_judge(file_path: str) -> dict:
         from neo4j import GraphDatabase
         from mcp_server.pipeline.llm_judge import LLMJudge
 
+        password = os.getenv("NEO4J_PASSWORD", "")
+        if not password:
+            return {"success": False, "error": "NEO4J_PASSWORD not set"}
         driver = GraphDatabase.driver(
-            "bolt://localhost:7687",
-            auth=("neo4j", "password123"),
-            connection_timeout=5
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), password),
+            connection_timeout=5,
         )
 
         judge = LLMJudge(driver)

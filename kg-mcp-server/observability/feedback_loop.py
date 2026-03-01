@@ -230,9 +230,13 @@ def process_write_feedback(written_content: str, file_path: str = ""):
     # Neo4j 가중치 업데이트 (v2: dual score + multi-signal)
     try:
         from neo4j import GraphDatabase
+        password = os.getenv("NEO4J_PASSWORD", "")
+        if not password:
+            logger.debug("Neo4j weight update skipped: NEO4J_PASSWORD not set")
+            return analysis
         driver = GraphDatabase.driver(
-            "bolt://localhost:7687",
-            auth=("neo4j", "password123"),
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), password),
             connection_timeout=2,
         )
         update_node_weights(driver, analysis["used"], analysis["unused"],

@@ -212,10 +212,29 @@ def _auto_index_if_new_project():
 # Intent-Aware Neo4j Queries
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _load_power_pack_env():
+    """Load ~/.claude/power-pack.env into os.environ if keys not already set."""
+    env_file = Path.home() / ".claude" / "power-pack.env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                os.environ.setdefault(key.strip(), value.strip())
+
+
 def _get_driver():
     try:
+        _load_power_pack_env()
+        password = os.getenv("NEO4J_PASSWORD", "")
+        if not password:
+            return None
         from neo4j import GraphDatabase
-        return GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password123"), connection_timeout=2)
+        return GraphDatabase.driver(
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), password),
+            connection_timeout=2,
+        )
     except Exception:
         return None
 
@@ -312,8 +331,8 @@ def query_by_intent(intent: str, target: Optional[str], keywords: List[str], lim
         print(f"[MCP-KG] Neo4j failed ({e}), cache fallback", file=sys.stderr)
         try:
             driver.close()
-        except:
-            pass
+        except Exception:
+            pass  # driver.close() best-effort during error handling
         return _load_cache()
 
 
@@ -495,8 +514,8 @@ def get_user_prompt() -> str:
         try:
             if not sys.stdin.isatty():
                 prompt = sys.stdin.read()
-        except:
-            pass
+        except Exception:
+            pass  # stdin read best-effort
     return prompt.strip()
 
 

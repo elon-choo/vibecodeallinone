@@ -55,7 +55,7 @@ describe('Users API (e2e)', () => {
     const validUser = {
       email: 'test@test.com',
       name: 'Test User',
-      password: 'Password123!',
+      password: 'Test1234!',
     };
 
     // Happy Path
@@ -129,7 +129,7 @@ describe('Users API (e2e)', () => {
         .send({
           email: 'test@test.com',
           name: 'Test User',
-          password: 'Password123!',
+          password: 'Test1234!',
         });
       createdUserId = response.body.id;
     });
@@ -169,7 +169,7 @@ describe('Users API (e2e)', () => {
         .send({
           email: 'lifecycle@test.com',
           name: 'Lifecycle User',
-          password: 'Password123!',
+          password: 'Test1234!',
         })
         .expect(201);
 

@@ -205,7 +205,7 @@ class KGFileWatcher:
         watch_dirs: list,
         neo4j_uri: str = "bolt://localhost:7687",
         neo4j_user: str = "neo4j",
-        neo4j_password: str = "password123",
+        neo4j_password: str = "",
         debounce_seconds: float = 1.0,
     ):
         self.watch_dirs = [os.path.abspath(d) for d in watch_dirs]
@@ -537,7 +537,7 @@ def main():
         help="Neo4j bolt URI (기본값: bolt://localhost:7687)",
     )
     parser.add_argument("--neo4j-user", default="neo4j", help="Neo4j 사용자명")
-    parser.add_argument("--neo4j-password", default="password123", help="Neo4j 비밀번호")
+    parser.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", ""), help="Neo4j 비밀번호 (환경변수 NEO4J_PASSWORD 우선)")
     parser.add_argument(
         "--debounce",
         type=float,

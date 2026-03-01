@@ -20,6 +20,17 @@ from pathlib import Path
 from datetime import datetime
 
 
+def _load_power_pack_env():
+    """Load ~/.claude/power-pack.env into os.environ if keys not already set."""
+    env_file = Path.home() / ".claude" / "power-pack.env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                os.environ.setdefault(key.strip(), value.strip())
+
+
 def get_written_file():
     """PostToolUse hook: stdin JSON에서 tool_input 추출, env var 폴백"""
     # 1차: stdin에서 읽기 (Claude Code PostToolUse hook 표준)
@@ -208,9 +219,13 @@ def upsert_to_neo4j(parsed: dict, file_path: str, namespace: str):
     """Neo4j에 MERGE (있으면 업데이트, 없으면 생성)"""
     try:
         from neo4j import GraphDatabase
+        _load_power_pack_env()
+        password = os.getenv("NEO4J_PASSWORD", "")
+        if not password:
+            return 0
         driver = GraphDatabase.driver(
-            "bolt://localhost:7687",
-            auth=("neo4j", "password123"),
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), password),
             connection_timeout=2,
         )
     except Exception:
@@ -309,8 +324,8 @@ def upsert_to_neo4j(parsed: dict, file_path: str, namespace: str):
         print(f"[KG-Indexer] Neo4j error: {e}", file=sys.stderr)
         try:
             driver.close()
-        except:
-            pass
+        except Exception:
+            pass  # driver.close() best-effort during error handling
 
     return count
 

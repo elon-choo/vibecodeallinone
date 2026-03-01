@@ -25,6 +25,17 @@ INJECTED_FILE = ANALYTICS_DIR / "last_injected_identifiers.json"
 DELETION_PENALTY = 2.0  # 삭제 시 강한 트라우마
 
 
+def _load_power_pack_env():
+    """Load ~/.claude/power-pack.env into os.environ if keys not already set."""
+    env_file = Path.home() / ".claude" / "power-pack.env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                os.environ.setdefault(key.strip(), value.strip())
+
+
 def read_tool_input():
     """PostToolUse hook: stdin JSON에서 tool_input 추출, env var 폴백"""
     # 1차: stdin에서 읽기 (Claude Code PostToolUse hook 표준)
@@ -115,7 +126,15 @@ def main():
     # Neo4j 강한 트라우마 업데이트
     try:
         from neo4j import GraphDatabase
-        driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password123"), connection_timeout=2)
+        _load_power_pack_env()
+        password = os.getenv("NEO4J_PASSWORD", "")
+        if not password:
+            return
+        driver = GraphDatabase.driver(
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), password),
+            connection_timeout=2,
+        )
         with driver.session() as session:
             for name in removed:
                 session.run("""

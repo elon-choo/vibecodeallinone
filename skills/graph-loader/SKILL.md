@@ -1,7 +1,11 @@
-# Graph Loader Skill
+---
+name: graph-loader
+description: "JSON-to-Neo4j graph loader. Loads knowledge_packet.json into Neo4j as nodes and edges. Use when loading project patterns, rules, or code knowledge into the graph database."
+license: MIT
+allowed-tools: Read Glob Grep Bash
+---
 
-## Name
-graph-loader
+# Graph Loader Skill
 
 ## Description
 JSON 데이터를 Neo4j 데이터베이스에 노드와 엣지로 적재합니다.

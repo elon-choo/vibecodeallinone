@@ -59,7 +59,7 @@ describe('UsersService', () => {
     const createUserDto: CreateUserDto = {
       email: 'test@test.com',
       name: 'Test User',
-      password: 'password123',
+      password: 'Test1234!',
     };
 
     const mockUser: User = {
@@ -225,7 +225,7 @@ describe('UsersController', () => {
     const createUserDto: CreateUserDto = {
       email: 'test@test.com',
       name: 'Test User',
-      password: 'password123',
+      password: 'Test1234!',
     };
 
     const mockUser: User = {

@@ -1,6 +1,7 @@
 ---
 name: code-reviewer
 description: "**CODE REVIEWER**: '리뷰해', '검토해', '봐줘', '피드백', '확인해', '체크해', '코드 품질', '분석해', '이거 괜찮아?' 요청 시 자동 발동. Write/Edit 도구 사용 직후 자동 적용. Quality Gate, Code Smell, 복잡도 분석, 통합 점수 산출."
+license: MIT
 allowed-tools:
   - Read
   - Glob

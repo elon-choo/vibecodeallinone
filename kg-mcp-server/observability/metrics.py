@@ -505,7 +505,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
                     if param.startswith("limit="):
                         try:
                             limit = int(param.split("=")[1])
-                        except:
+                        except (ValueError, IndexError):
                             pass
             analytics = self._get_analytics()
             summary = analytics.get_analytics_summary()

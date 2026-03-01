@@ -1,6 +1,7 @@
 ---
 name: tdd-guardian
 description: "**TDD GUARDIAN**: '테스트 작성', '테스트 만들어', 'TDD', '단위 테스트', '통합 테스트', '커버리지', 'mock', '모킹' 요청 시 자동 발동. *.test.ts/*.spec.ts/test_*.py 파일 작업 시 자동 적용. Fake Test 탐지, 80% 커버리지 게이트. Jest/Vitest/PyTest/JUnit 템플릿."
+license: MIT
 allowed-tools:
   - Read
   - Glob

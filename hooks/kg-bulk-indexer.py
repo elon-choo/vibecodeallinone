@@ -20,8 +20,20 @@ EXCLUDE_DIRS = {
     "egg-info", ".eggs", "site-packages", ".claude"
 }
 
-NEO4J_URI = "bolt://localhost:7687"
-NEO4J_AUTH = ("neo4j", "password123")
+def _load_power_pack_env():
+    """Load ~/.claude/power-pack.env into os.environ if keys not already set."""
+    env_file = Path.home() / ".claude" / "power-pack.env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                os.environ.setdefault(key.strip(), value.strip())
+
+_load_power_pack_env()
+
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_AUTH = (os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", ""))
 
 SUPPORTED_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx"}
 

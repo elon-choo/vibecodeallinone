@@ -37,9 +37,9 @@ def check_kg_loaded() -> bool:
                             return True
                         if e.get("type") == "session_start" and e.get("kg_injected"):
                             return True
-                except:
+                except (json.JSONDecodeError, KeyError):
                     continue
-    except:
+    except OSError:
         pass
 
     # 시간 기반 폴백: 최근 2분 내 아무 kg_loaded가 있으면 OK
@@ -54,9 +54,9 @@ def check_kg_loaded() -> bool:
                         t = datetime.fromisoformat(ts).replace(tzinfo=None)
                         if t > cutoff and (e.get("type") == "kg_loaded" or e.get("kg_injected")):
                             return True
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError):
                     continue
-    except:
+    except OSError:
         pass
 
     return False

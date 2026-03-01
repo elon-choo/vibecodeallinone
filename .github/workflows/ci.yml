@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  install-smoke-test:
+    name: Install Smoke Test (Tier 1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Tier 1 install
+        run: bash scripts/install.sh 1
+
+      - name: Verify skills installed
+        run: |
+          count=$(ls -d "$HOME/.claude/skills"/*/ 2>/dev/null | wc -l)
+          echo "Installed $count skills"
+          if [ "$count" -lt 12 ]; then
+            echo "FAIL: Expected 12 skills, got $count"
+            exit 1
+          fi
+
+  python-lint:
+    name: Python Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint hooks
+        run: ruff check hooks/
+
+      - name: Lint kg-mcp-server
+        run: ruff check kg-mcp-server/ --ignore E501
+
+  skill-frontmatter:
+    name: SKILL.md Frontmatter Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pyyaml
+        run: pip install pyyaml
+
+      - name: Validate frontmatter
+        run: |
+          python3 -c "
+          import yaml, sys, glob
+
+          required = ['name', 'description', 'license', 'allowed-tools']
+          errors = []
+
+          for path in sorted(glob.glob('skills/*/SKILL.md')):
+              with open(path) as f:
+                  content = f.read()
+              if not content.startswith('---'):
+                  errors.append(f'{path}: missing YAML frontmatter')
+                  continue
+              parts = content.split('---', 2)
+              if len(parts) < 3:
+                  errors.append(f'{path}: malformed frontmatter')
+                  continue
+              try:
+                  meta = yaml.safe_load(parts[1])
+              except yaml.YAMLError as e:
+                  errors.append(f'{path}: invalid YAML: {e}')
+                  continue
+              if not isinstance(meta, dict):
+                  errors.append(f'{path}: frontmatter is not a mapping')
+                  continue
+              for field in required:
+                  if field not in meta:
+                      errors.append(f'{path}: missing required field \"{field}\"')
+
+          if errors:
+              for e in errors:
+                  print(f'ERROR: {e}', file=sys.stderr)
+              sys.exit(1)
+          else:
+              print(f'All {len(glob.glob(\"skills/*/SKILL.md\"))} SKILL.md files valid')
+          "
+
+  secret-scan:
+    name: Secret Detection (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tests:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: pytest tests/ -v

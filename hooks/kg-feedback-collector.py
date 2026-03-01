@@ -17,6 +17,17 @@ from pathlib import Path
 from datetime import datetime
 
 ANALYTICS_DIR = Path.home() / ".claude" / "mcp-kg-analytics"
+
+
+def _load_power_pack_env():
+    """Load ~/.claude/power-pack.env into os.environ if keys not already set."""
+    env_file = Path.home() / ".claude" / "power-pack.env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                os.environ.setdefault(key.strip(), value.strip())
 INJECTED_FILE = ANALYTICS_DIR / "last_injected_identifiers.json"
 FEEDBACK_FILE = ANALYTICS_DIR / "feedback_events.jsonl"
 
@@ -189,7 +200,15 @@ def update_neo4j(used: list, unused: list, details: dict, intent: str):
     """v3: Dual Score + Intent-Aware Negative + Multi-Signal"""
     try:
         from neo4j import GraphDatabase
-        driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password123"), connection_timeout=2)
+        _load_power_pack_env()
+        password = os.getenv("NEO4J_PASSWORD", "")
+        if not password:
+            return
+        driver = GraphDatabase.driver(
+            os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), password),
+            connection_timeout=2,
+        )
         with driver.session() as session:
             # 유용한 노드: positive_score += 신호별 가중치
             if used:

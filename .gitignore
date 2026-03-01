@@ -8,3 +8,5 @@ __pycache__/
 .vibeconfig.local.yml
 venv/
 .venv/
+.pytest_cache/
+tests/__pycache__/

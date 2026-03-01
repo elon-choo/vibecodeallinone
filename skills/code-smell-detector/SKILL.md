@@ -1,6 +1,7 @@
 ---
 name: code-smell-detector
 description: "**CODE SMELL DETECTOR** - 코드 작성/리뷰 시 자동 발동. 나쁜 코드 패턴 조기 탐지. God Object, Long Method, Feature Envy 등 22가지 코드 스멜 감지. 문제가 커지기 전에 리팩토링 제안."
+license: MIT
 allowed-tools:
   - Read
   - Glob
