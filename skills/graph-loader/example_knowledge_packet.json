@@ -1,0 +1,29 @@
+{
+  "repo": "my-project",
+  "patterns": [
+    {
+      "name": "singleton",
+      "rules": [
+        "전역 인스턴스 하나만 생성",
+        "private 생성자 사용",
+        "getInstance() 메서드로 접근"
+      ]
+    },
+    {
+      "name": "factory",
+      "rules": [
+        "객체 생성 로직 캡슐화",
+        "인터페이스 기반 반환",
+        "구체 클래스 의존성 제거"
+      ]
+    },
+    {
+      "name": "repository",
+      "rules": [
+        "데이터 접근 로직 추상화",
+        "도메인 객체 반환",
+        "인프라 계층 분리"
+      ]
+    }
+  ]
+}

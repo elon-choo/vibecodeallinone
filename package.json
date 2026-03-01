@@ -1,0 +1,21 @@
+{
+  "name": "claude-code-power-pack",
+  "version": "2.0.0",
+  "description": "12 AI skills + Knowledge Graph MCP server for Claude Code. Clean code enforcement, vibe coding orchestration, and codebase intelligence.",
+  "keywords": [
+    "claude-code", "agent-skills", "clean-code", "vibe-coding",
+    "knowledge-graph", "neo4j", "mcp-server", "code-quality",
+    "SOLID", "OWASP", "orchestrator", "AI-coding"
+  ],
+  "author": "elon-opensource",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elon-opensource/claude-code-power-pack"
+  },
+  "scripts": {
+    "install-skills": "bash scripts/install.sh 1",
+    "install-kg": "bash scripts/install.sh 2",
+    "install-full": "bash scripts/install.sh 3"
+  }
+}

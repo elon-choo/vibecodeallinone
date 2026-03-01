@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+__pycache__/
+*.pyc
+.env
+.env.local
+*.log
+.vibeconfig.local.yml
+venv/
+.venv/
