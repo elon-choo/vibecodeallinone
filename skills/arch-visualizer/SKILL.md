@@ -1,6 +1,6 @@
 ---
 name: arch-visualizer
-description: "**ARCH VISUALIZER v1.0** - '아키텍처', '구조', '시각화', '다이어그램', '문서화', 'codebase_graph.md', '프로젝트 구조' 요청 시 자동 발동. codebase-graph 기반 자동 아키텍처 문서/다이어그램 생성. Mermaid/PlantUML/ASCII 다이어그램, 자동 갱신 지원."
+description: "**ARCH VISUALIZER v1.0** — Auto-generates architecture docs and diagrams from codebase-graph. Produces Mermaid/PlantUML/ASCII diagrams with auto-refresh. Use when requesting architecture visualization, structure diagrams, or project documentation."
 license: MIT
 allowed-tools:
   - Read

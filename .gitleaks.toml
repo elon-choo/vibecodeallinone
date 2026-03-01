@@ -1,0 +1,8 @@
+title = "Claude Code Power Pack - Gitleaks Config"
+
+[allowlist]
+description = "Allow example/placeholder values in documentation"
+paths = [
+    '''.env\.example''',
+    '''tests/test_config\.py''',
+]

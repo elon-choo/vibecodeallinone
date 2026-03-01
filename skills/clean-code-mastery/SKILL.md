@@ -7,7 +7,12 @@ metadata:
   version: "4.0.0"
   author: "elon-opensource"
   languages: 8
-allowed-tools: Read Glob Grep Agent Skill
+allowed-tools:
+  - Read
+  - Glob
+  - Grep
+  - Agent
+  - Skill
 ---
 
 # Clean Code Mastery v4.0

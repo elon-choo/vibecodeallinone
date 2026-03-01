@@ -1,5 +1,9 @@
 # Claude Code Power Pack
 
+[![CI](https://github.com/elon-choo/vibecodeallinone/actions/workflows/ci.yml/badge.svg)](https://github.com/elon-choo/vibecodeallinone/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 12 AI skills + Knowledge Graph MCP server for [Claude Code](https://claude.com/claude-code).
 
 Clean code enforcement, vibe coding orchestration, codebase-aware reviews, and intelligent context management — all in one package.
@@ -7,7 +11,7 @@ Clean code enforcement, vibe coding orchestration, codebase-aware reviews, and i
 ## 30-Second Install
 
 ```bash
-git clone https://github.com/elon-opensource/claude-code-power-pack.git
+git clone https://github.com/elon-choo/vibecodeallinone.git
 cd claude-code-power-pack
 bash scripts/install.sh
 ```

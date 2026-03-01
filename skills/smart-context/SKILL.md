@@ -1,6 +1,6 @@
 ---
 name: smart-context
-description: "**SMART CONTEXT v1.0** - '컨텍스트', '관련 코드', '참조', '토큰 절약', '효율적 분석' 요청 시 자동 발동. codebase-graph 기반으로 필요한 컨텍스트만 선택적 추출. 토큰 72% 절감, 정확도 92% 달성. 모든 코드 분석 작업의 기반 레이어."
+description: "**SMART CONTEXT v1.0** — Selective context extraction from codebase-graph, loading only what's needed. 72% token savings, 92% accuracy. Foundation layer for all code analysis tasks. Use for context optimization, related code lookup, or efficient analysis."
 license: MIT
 allowed-tools:
   - Read

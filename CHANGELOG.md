@@ -58,4 +58,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed all hardcoded credentials; secrets loaded from environment variables
 - Added `security-shield` skill with 40+ secret detection patterns
 
-[2.0.0]: https://github.com/elon-opensource/claude-code-power-pack/releases/tag/v2.0.0
+[2.0.0]: https://github.com/elon-choo/vibecodeallinone/releases/tag/v2.0.0

@@ -1,6 +1,6 @@
 ---
 name: security-shield
-description: "**SECURITY SHIELD**: '보안', '인증', '로그인', '비밀번호', 'JWT', '토큰', '암호화', '취약점', 'SQL 인젝션', 'XSS', '보안 검사' 요청 시 자동 발동. .env/auth/**/guard/** 파일 작업 시 자동 적용. 하드코딩 시크릿 탐지(40+ 패턴), OWASP Top 10 검증."
+description: "**SECURITY SHIELD** — Hardcoded secret detection (40+ patterns) and OWASP Top 10 validation. Auto-activates on .env/auth/**/guard/** file operations. Use for security audits, authentication review, JWT/token checks, encryption, or vulnerability scanning."
 license: MIT
 allowed-tools:
   - Read

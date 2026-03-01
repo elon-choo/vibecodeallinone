@@ -2,7 +2,11 @@
 name: graph-loader
 description: "JSON-to-Neo4j graph loader. Loads knowledge_packet.json into Neo4j as nodes and edges. Use when loading project patterns, rules, or code knowledge into the graph database."
 license: MIT
-allowed-tools: Read Glob Grep Bash
+allowed-tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
 ---
 
 # Graph Loader Skill

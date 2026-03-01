@@ -11,7 +11,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/elon-opensource/claude-code-power-pack"
+    "url": "https://github.com/elon-choo/vibecodeallinone"
   },
   "scripts": {
     "install-skills": "bash scripts/install.sh 1",

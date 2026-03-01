@@ -1,6 +1,6 @@
 ---
 name: codebase-graph
-description: "**CODEBASE GRAPH v1.0** - '의존성', '그래프', '코드베이스 분석', '함수 관계', '모듈 관계', '아키텍처 분석', 'import 분석' 요청 시 자동 발동. 프로젝트 시작 시 자동 생성. 온톨로지 기반 코드 지식 그래프로 함수→함수, 모듈→모듈 관계를 Edge로 연결. 토큰 72% 절감, 정확도 92% 달성."
+description: "**CODEBASE GRAPH v1.0** — Ontology-based code knowledge graph connecting function-to-function and module-to-module relationships as edges. Auto-generates on project start. 72% token savings, 92% accuracy. Use for dependency analysis, codebase analysis, or import analysis."
 license: MIT
 allowed-tools:
   - Read

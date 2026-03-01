@@ -8,7 +8,13 @@ metadata:
   author: "elon-opensource"
   skills_included: 2
   skills_compatible: 18
-allowed-tools: Read Glob Grep Agent Skill Bash
+allowed-tools:
+  - Read
+  - Glob
+  - Grep
+  - Agent
+  - Skill
+  - Bash
 ---
 
 # Vibe Coding Orchestrator v6.0
