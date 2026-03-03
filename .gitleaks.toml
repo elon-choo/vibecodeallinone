@@ -1,8 +1,19 @@
 title = "Claude Code Power Pack - Gitleaks Config"
 
+[extend]
+useDefault = true
+
 [allowlist]
 description = "Allow example/placeholder values in documentation"
 paths = [
     '''.env\.example''',
     '''tests/test_config\.py''',
+]
+stopwords = [
+    "example",
+    "placeholder",
+    "your-api-key-here",
+    "test",
+    "dummy",
+    "sample",
 ]

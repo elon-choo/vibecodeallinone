@@ -1,13 +1,50 @@
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import logging
 import os
 
-from src.indexing.graph_builder import KnowledgeGraphBuilder
 from neo4j import GraphDatabase
 import ast
 
 logger = logging.getLogger(__name__)
+
+
+# ── Lightweight data models (replaces external src.ingestion.parser) ──────────
+
+@dataclass
+class FunctionInfo:
+    name: str = ""
+    file_path: str = ""
+    start_line: int = 0
+    end_line: int = 0
+    code: str = ""
+    docstring: Optional[str] = None
+    parameters: List[str] = field(default_factory=list)
+    return_type: Optional[str] = None
+    decorators: List[str] = field(default_factory=list)
+    is_method: bool = False
+    parent_class: Optional[str] = None
+    calls: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ClassInfo:
+    name: str = ""
+    file_path: str = ""
+    start_line: int = 0
+    end_line: int = 0
+    code: str = ""
+    docstring: Optional[str] = None
+    bases: List[str] = field(default_factory=list)
+
+
+@dataclass
+class FileParseResult:
+    file_path: str = ""
+    language: str = "unknown"
+    functions: List[FunctionInfo] = field(default_factory=list)
+    classes: List[ClassInfo] = field(default_factory=list)
 
 # tree-sitter 파서 지원 확장자
 TS_SUPPORTED_EXTS = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.go', '.rs'}
@@ -32,8 +69,6 @@ class GraphWriteBack:
 
     def _parse_with_tree_sitter(self, file_path: str) -> Optional[Any]:
         """tree-sitter 기반 파서로 파일 파싱 후 FileParseResult로 변환."""
-        from src.ingestion.parser import FileParseResult, FunctionInfo, ClassInfo
-
         parser = self._get_ts_parser()
         if parser is None:
             return None
@@ -90,8 +125,6 @@ class GraphWriteBack:
 
     def _parse_python_ast(self, file_path: str):
         """간단한 Python AST 기반 파서 (tree-sitter 에러 우회용)"""
-        from src.ingestion.parser import FileParseResult, FunctionInfo, ClassInfo, ImportInfo
-        
         with open(file_path, 'r', encoding='utf-8') as f:
             code = f.read()
             
@@ -144,6 +177,67 @@ class GraphWriteBack:
                 
         return result
         
+    def _upsert_to_neo4j(self, result: FileParseResult, file_path: str, repo_url: str) -> Dict[str, int]:
+        """Parse result를 Neo4j에 직접 MERGE/UPDATE."""
+        stats = {"functions": 0, "classes": 0, "relationships": 0}
+        module_name = Path(file_path).stem
+        try:
+            with self.driver.session() as session:
+                # File 노드
+                session.run("""
+                    MERGE (f:File {path: $path})
+                    SET f.language = $lang, f.repo = $repo, f.updated_at = datetime()
+                """, path=file_path, lang=result.language, repo=repo_url)
+
+                for func in result.functions:
+                    session.run("""
+                        MERGE (fn:Function {name: $name, file_path: $fp})
+                        SET fn.start_line = $sl, fn.end_line = $el,
+                            fn.code = $code, fn.docstring = $doc,
+                            fn.module = $module, fn.updated_at = datetime()
+                    """, name=func.name, fp=file_path,
+                        sl=func.start_line, el=func.end_line,
+                        code=(func.code or "")[:5000], doc=func.docstring or "",
+                        module=module_name)
+                    # File -> Function relationship
+                    session.run("""
+                        MATCH (f:File {path: $fp})
+                        MATCH (fn:Function {name: $name, file_path: $fp})
+                        MERGE (f)-[:DEFINES]->(fn)
+                    """, fp=file_path, name=func.name)
+                    stats["functions"] += 1
+
+                for cls in result.classes:
+                    session.run("""
+                        MERGE (c:Class {name: $name, file_path: $fp})
+                        SET c.start_line = $sl, c.end_line = $el,
+                            c.code = $code, c.docstring = $doc,
+                            c.module = $module, c.updated_at = datetime()
+                    """, name=cls.name, fp=file_path,
+                        sl=cls.start_line, el=cls.end_line,
+                        code=(cls.code or "")[:5000], doc=cls.docstring or "",
+                        module=module_name)
+                    session.run("""
+                        MATCH (f:File {path: $fp})
+                        MATCH (c:Class {name: $name, file_path: $fp})
+                        MERGE (f)-[:DEFINES]->(c)
+                    """, fp=file_path, name=cls.name)
+                    stats["classes"] += 1
+
+                # CALLS relationships from function calls
+                for func in result.functions:
+                    for call_name in func.calls:
+                        session.run("""
+                            MATCH (caller:Function {name: $caller, file_path: $fp})
+                            MATCH (callee:Function {name: $callee})
+                            MERGE (caller)-[:CALLS]->(callee)
+                        """, caller=func.name, fp=file_path, callee=call_name)
+                        stats["relationships"] += 1
+
+        except Exception as e:
+            logger.error(f"Neo4j upsert error: {e}")
+        return stats
+
     def sync_file(self, file_path: str, repo_url: str = "local") -> Dict[str, Any]:
         """단일 파일의 변경사항을 구문분석하여 Neo4j에 즉시 반영"""
         path = Path(file_path)
@@ -159,42 +253,18 @@ class GraphWriteBack:
                 except Exception as e:
                     logger.debug(f"tree-sitter parse failed, falling back: {e}")
 
-            # Fallback: Python AST 또는 기존 CodeParser
+            # Fallback: Python AST (non-Python files rely on tree-sitter)
             if result is None:
                 if path.suffix == '.py':
                     result = self._parse_python_ast(str(path))
                 else:
-                    from src.ingestion.parser import CodeParser
-                    parser = CodeParser()
-                    result = parser.parse_file(str(path))
+                    logger.debug(f"No parser available for {path.suffix} (tree-sitter failed)")
                 
             if not result:
                 return {"success": False, "error": "Could not parse file (unsupported extension?)"}
             
-            # 2. Neo4j 업데이트 (기존 노드를 MERGE/UPDATE)
-            class DummyConnector:
-                def __init__(self, driver):
-                    self.driver = driver
-                def run_query(self, query, params=None, fetch=True):
-                    with self.driver.session() as session:
-                        res = session.run(query, params or {})
-                        if fetch:
-                            try:
-                                return [dict(r) for r in res]
-                            except Exception:
-                                return []
-                        return []
-                def create_constraints(self): pass
-                def create_indexes(self): pass
-            
-            connector = DummyConnector(self.driver)
-            builder = KnowledgeGraphBuilder(connector=connector)
-            
-            # 파일 노드와 내부 요소 업데이트
-            stats = builder.process_file_result(result, repo_url)
-
-            # 내부 관계 업데이트
-            builder.build_relationships([result])
+            # 2. Neo4j 업데이트 (직접 MERGE/UPDATE)
+            stats = self._upsert_to_neo4j(result, file_path, repo_url)
 
             # Phase 5.3: Bug Radar - 수정 이력 기록
             modified_names = (
@@ -242,10 +312,10 @@ class GraphWriteBack:
                 except Exception as e:
                     logger.debug(f"Auto-embedding skipped: {e}")
 
-            # Phase 6.4: Data Dependency extraction
+            # Phase 6.4: Data Dependency extraction (optional)
             dep_stats = {}
             try:
-                from src.ingestion.data_dep_extractor import (
+                from mcp_server.pipeline.data_dep_extractor import (
                     DataDependencyExtractor,
                     DataDependencyGraphWriter,
                 )
@@ -256,10 +326,11 @@ class GraphWriteBack:
                     deps = extractor.extract(source)
                     if deps:
                         writer = DataDependencyGraphWriter(self.driver)
-                        # 기존 stale 엣지 정리 후 새로 기록
                         writer.cleanup_stale(file_path)
                         dep_stats = writer.write_dependencies(deps)
                         logger.info(f"Data dependencies for {file_path}: {dep_stats}")
+            except ImportError:
+                logger.debug("Data dependency extractor not available")
             except Exception as e:
                 logger.debug(f"Data dependency extraction skipped: {e}")
 

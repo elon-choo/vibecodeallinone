@@ -20,8 +20,11 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# ~/.env에서 GEMINI_API_KEY 로드
-load_dotenv(os.path.expanduser("~/.env"))
+# ~/.claude/power-pack.env에서 API 키 로드 (fallback: ~/.env)
+_env_file = os.path.expanduser("~/.claude/power-pack.env")
+if not os.path.exists(_env_file):
+    _env_file = os.path.expanduser("~/.env")
+load_dotenv(_env_file)
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 

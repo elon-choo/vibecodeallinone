@@ -15,7 +15,10 @@ from typing import Dict, Any, List, Optional
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-load_dotenv(os.path.expanduser("~/.env"))
+_env_file = os.path.expanduser("~/.claude/power-pack.env")
+if not os.path.exists(_env_file):
+    _env_file = os.path.expanduser("~/.env")
+load_dotenv(_env_file)
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 logger = logging.getLogger(__name__)

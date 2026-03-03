@@ -20,7 +20,10 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-load_dotenv(os.path.expanduser("~/.env"))
+_env_file = os.path.expanduser("~/.claude/power-pack.env")
+if not os.path.exists(_env_file):
+    _env_file = os.path.expanduser("~/.env")
+load_dotenv(_env_file)
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 DESCRIBE_PROMPT = """You are a senior developer writing concise function/class descriptions for a code search index.

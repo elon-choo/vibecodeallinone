@@ -171,7 +171,10 @@ def _run_judge(file_path: str) -> dict:
 
         # 환경변수 로드
         from dotenv import load_dotenv
-        load_dotenv(os.path.expanduser("~/.env"))
+        _env_file = os.path.expanduser("~/.claude/power-pack.env")
+        if not os.path.exists(_env_file):
+            _env_file = os.path.expanduser("~/.env")
+        load_dotenv(_env_file)
 
         from neo4j import GraphDatabase
         from mcp_server.pipeline.llm_judge import LLMJudge

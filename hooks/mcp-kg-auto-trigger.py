@@ -181,7 +181,7 @@ def _auto_index_if_new_project():
         return
 
     # auto_index_project.py (v2 풀 파이프라인) 사용
-    kg_root = Path.home() / "Documents" / "neo4j_knowledgeGraph"
+    kg_root = Path.home() / ".claude" / "kg-mcp-server"
     indexer = kg_root / "scripts" / "auto_index_project.py"
     if not indexer.exists():
         # fallback: 레거시 벌크 인덱서
@@ -261,7 +261,7 @@ def _try_hybrid_search(query: str, limit: int = 5) -> List[dict]:
     """MCP 서버의 HybridSearchEngine을 직접 호출 (vector search 포함)."""
     try:
         # Auto-detect KG MCP server path
-        kg_root = os.getenv("KG_MCP_ROOT", str(Path.home() / "Documents" / "neo4j_knowledgeGraph"))
+        kg_root = os.getenv("KG_MCP_ROOT", str(Path.home() / ".claude" / "kg-mcp-server"))
         sys.path.insert(0, kg_root)
         # Voyage API key must be set in environment (no hardcoded fallback)
         from mcp_server.pipeline.hybrid_search import HybridSearchEngine
@@ -842,7 +842,7 @@ def main():
         # ═══ Phase 5.2: Conversation-Aware Adaptive Context ═══
         conv_refinement = {}
         try:
-            sys.path.insert(0, str(Path.home() / "Documents" / "neo4j_knowledgeGraph"))
+            sys.path.insert(0, str(Path.home() / ".claude" / "kg-mcp-server"))
             from mcp_server.pipeline.adaptive_context import ConversationMemory
             project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
             conv_memory = ConversationMemory(project_dir)

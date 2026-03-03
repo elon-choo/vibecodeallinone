@@ -1,4 +1,4 @@
-# Contributing to Claude Code Quality Kit
+# Contributing to Claude Code Power Pack
 
 Thank you for your interest in contributing! This guide will help you get started.
 

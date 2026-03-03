@@ -4,7 +4,7 @@ import os
 import importlib.util
 from pathlib import Path
 
-CONFIG_PATH = Path(__file__).parent.parent / "kg-mcp-server" / "config.py"
+CONFIG_PATH = Path(__file__).parent.parent / "kg-mcp-server" / "mcp_server" / "config.py"
 
 
 def _load_config():

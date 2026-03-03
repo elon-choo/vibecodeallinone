@@ -21,8 +21,11 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# ~/.env에서 API 키 로드
-load_dotenv(os.path.expanduser("~/.env"))
+# ~/.claude/power-pack.env에서 API 키 로드 (fallback: ~/.env)
+_env_file = os.path.expanduser("~/.claude/power-pack.env")
+if not os.path.exists(_env_file):
+    _env_file = os.path.expanduser("~/.env")
+load_dotenv(_env_file)
 
 # 프로바이더 감지
 _VOYAGE_KEY = os.getenv("VOYAGE_API_KEY", "")

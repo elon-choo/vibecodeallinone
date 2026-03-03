@@ -12,7 +12,7 @@ Clean code enforcement, vibe coding orchestration, codebase-aware reviews, and i
 
 ```bash
 git clone https://github.com/elon-choo/vibecodeallinone.git
-cd claude-code-power-pack
+cd vibecodeallinone
 bash scripts/install.sh
 ```
 

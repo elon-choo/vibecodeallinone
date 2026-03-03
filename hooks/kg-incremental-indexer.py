@@ -128,7 +128,7 @@ def parse_with_tree_sitter(content: str, file_path: str) -> dict:
     """
     try:
         import sys as _sys
-        _sys.path.insert(0, str(Path.home() / "Documents" / "neo4j_knowledgeGraph"))
+        _sys.path.insert(0, str(Path.home() / ".claude" / "kg-mcp-server"))
         from mcp_server.pipeline.ts_parser import TreeSitterParser
     except ImportError:
         # tree-sitter 없으면 regex 폴백
