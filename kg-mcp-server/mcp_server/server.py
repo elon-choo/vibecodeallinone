@@ -172,7 +172,6 @@ class KnowledgeGraphServer:
             logger.info("Neo4j indexes verified/created (Function, Class, File)")
         except Exception as e:
             logger.warning(f"Neo4j index creation failed (non-fatal): {e}")
-                raise
 
     def _setup_handlers(self):
         """MCP 핸들러 설정"""

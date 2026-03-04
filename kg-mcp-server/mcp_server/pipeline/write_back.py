@@ -2,9 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import logging
-import os
 
-from neo4j import GraphDatabase
 import ast
 
 logger = logging.getLogger(__name__)
