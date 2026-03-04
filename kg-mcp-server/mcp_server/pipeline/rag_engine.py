@@ -15,7 +15,7 @@ import re
 import time
 from typing import Dict, List, Optional, Any
 
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ _env_file = os.path.expanduser("~/.claude/power-pack.env")
 if not os.path.exists(_env_file):
     _env_file = os.path.expanduser("~/.env")
 load_dotenv(_env_file)
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+_gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 # 답변 캐시 (동일 질문 5분 TTL)
 _answer_cache: Dict[str, Any] = {}
@@ -63,7 +63,7 @@ class RAGEngine:
             driver: Neo4j driver 인스턴스
         """
         self.driver = driver
-        self.model = genai.GenerativeModel("gemini-3-flash-preview")
+        self.model_name = "gemini-3-flash-preview"
 
         # Lazy init으로 순환 임포트 방지
         self._hybrid_search = None
@@ -341,7 +341,9 @@ class RAGEngine:
         prompt = RAG_SYSTEM_PROMPT.format(context=context, question=question)
 
         try:
-            response = self.model.generate_content(prompt)
+            response = _gemini_client.models.generate_content(
+                model=self.model_name, contents=prompt
+            )
             answer_text = response.text
 
             if not answer_text or not answer_text.strip():

@@ -1,12 +1,16 @@
 """
 Embedding Pipeline (Phase 10)
 ==============================
-voyage-code-3 (코드 전용 SOTA, 79.23% CoIR) + OpenAI fallback.
+voyage-code-3 전용 (코드 전용 SOTA, 79.23% CoIR).
 코드 검색 정확도 13-17% 향상.
 
+CRITICAL: OpenAI fallback 제거됨.
+Voyage(1024D)와 OpenAI(1536D)의 차원 불일치로 인해
+fallback 시 Neo4j 벡터 인덱스 크래시 또는 garbage 유사도 발생.
+VOYAGE_API_KEY 없으면 embedding을 skip합니다.
+
 Features:
-- voyage-code-3 기본 (1024 차원, 코드 전용 최적화)
-- OpenAI fallback (text-embedding-3-small, 1536 차원)
+- voyage-code-3 전용 (1024 차원, 코드 전용 최적화)
 - Neo4j Vector Index 생성 (cosine similarity)
 - 전체 노드 벌크 임베딩 + 증분 임베딩
 - Exponential backoff on rate limit errors
@@ -27,43 +31,40 @@ if not os.path.exists(_env_file):
     _env_file = os.path.expanduser("~/.env")
 load_dotenv(_env_file)
 
-# 프로바이더 감지
+# Voyage only — OpenAI fallback 제거 (차원 불일치 방지)
 _VOYAGE_KEY = os.getenv("VOYAGE_API_KEY", "")
-_PROVIDER = "voyage" if _VOYAGE_KEY else "openai"
+_EMBEDDING_AVAILABLE = bool(_VOYAGE_KEY)
 
-if _PROVIDER == "voyage":
+if _EMBEDDING_AVAILABLE:
     import voyageai
     EMBEDDING_MODEL = "voyage-code-3"
     EMBEDDING_DIMENSIONS = 1024
-    MAX_BATCH_SIZE = 128  # Voyage 배치 제한
+    MAX_BATCH_SIZE = 128
     logger.info("Embedding provider: Voyage (voyage-code-3, 1024d)")
 else:
-    from openai import OpenAI, RateLimitError, APIError
-    EMBEDDING_MODEL = "text-embedding-3-small"
-    EMBEDDING_DIMENSIONS = 1536
-    MAX_BATCH_SIZE = 2048
-    logger.info("Embedding provider: OpenAI (text-embedding-3-small, 1536d)")
+    EMBEDDING_MODEL = "voyage-code-3"
+    EMBEDDING_DIMENSIONS = 1024
+    MAX_BATCH_SIZE = 128
+    logger.warning("VOYAGE_API_KEY not set — embedding features disabled")
 
 DEFAULT_PROCESS_BATCH = 100
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 1.0
-RPM_LIMIT = 3000 if _PROVIDER == "openai" else 300  # Voyage RPM 제한
+RPM_LIMIT = 300  # Voyage RPM 제한
 RPM_SAFETY_MARGIN = 0.8
 
 
 class EmbeddingPipeline:
     """
     Neo4j Function/Class 노드에 임베딩 벡터를 생성하고 저장하는 파이프라인.
-    voyage-code-3 (코드 전용 SOTA) 기본, OpenAI fallback.
+    voyage-code-3 전용. VOYAGE_API_KEY 없으면 embedding skip.
     """
 
     def __init__(self, driver):
         self.driver = driver
-        self.provider = _PROVIDER
-        if self.provider == "voyage":
+        self.available = _EMBEDDING_AVAILABLE
+        if self.available:
             self.voyage_client = voyageai.Client(api_key=_VOYAGE_KEY)
-        else:
-            self.client = OpenAI()
         self._request_count = 0
         self._minute_start = time.time()
 
@@ -73,6 +74,8 @@ class EmbeddingPipeline:
 
     def embed_text(self, text: str) -> List[float]:
         """단일 텍스트를 임베딩 벡터로 변환."""
+        if not self.available:
+            raise RuntimeError("Embedding unavailable: VOYAGE_API_KEY not set")
         if not text or not text.strip():
             raise ValueError("Empty text cannot be embedded")
         result = self._call_embed_with_retry([text])
@@ -80,6 +83,8 @@ class EmbeddingPipeline:
 
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """배치 텍스트를 임베딩 벡터로 변환."""
+        if not self.available:
+            raise RuntimeError("Embedding unavailable: VOYAGE_API_KEY not set")
         if not texts:
             return []
         all_embeddings = []
@@ -91,28 +96,19 @@ class EmbeddingPipeline:
         return all_embeddings
 
     def _call_embed_with_retry(self, texts: List[str]) -> List[List[float]]:
-        """임베딩 API 호출 + exponential backoff (Voyage/OpenAI 자동 분기)."""
+        """Voyage 임베딩 API 호출 + exponential backoff."""
         self._check_rate_limit()
         backoff = INITIAL_BACKOFF
 
         for attempt in range(MAX_RETRIES):
             try:
-                if self.provider == "voyage":
-                    result = self.voyage_client.embed(
-                        texts,
-                        model=EMBEDDING_MODEL,
-                        input_type="document",
-                    )
-                    self._request_count += 1
-                    return result.embeddings
-                else:
-                    response = self.client.embeddings.create(
-                        model=EMBEDDING_MODEL,
-                        input=texts,
-                        dimensions=EMBEDDING_DIMENSIONS,
-                    )
-                    self._request_count += 1
-                    return [item.embedding for item in response.data]
+                result = self.voyage_client.embed(
+                    texts,
+                    model=EMBEDDING_MODEL,
+                    input_type="document",
+                )
+                self._request_count += 1
+                return result.embeddings
 
             except Exception as e:
                 err_str = str(e).lower()
@@ -243,6 +239,11 @@ class EmbeddingPipeline:
                 "elapsed_seconds": float,
             }
         """
+        if not self.available:
+            logger.warning("Embedding skipped: VOYAGE_API_KEY not set")
+            return {"total_processed": 0, "total_embedded": 0, "total_skipped": 0,
+                    "total_errors": 0, "elapsed_seconds": 0.0, "skipped_reason": "VOYAGE_API_KEY not set"}
+
         start_time = time.time()
         total_processed = 0
         total_embedded = 0
@@ -369,7 +370,7 @@ class EmbeddingPipeline:
 
         Args:
             element_id: Neo4j elementId
-            embedding: 1536차원 벡터
+            embedding: 1024차원 벡터 (voyage-code-3)
         """
         with self.driver.session() as session:
             session.run("""
@@ -395,6 +396,8 @@ class EmbeddingPipeline:
         Returns:
             성공 여부
         """
+        if not self.available:
+            return False
         try:
             # 노드 조회
             with self.driver.session() as session:

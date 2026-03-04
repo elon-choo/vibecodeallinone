@@ -15,7 +15,7 @@ from typing import Dict, List, Optional
 
 import logging
 
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ _env_file = os.path.expanduser("~/.claude/power-pack.env")
 if not os.path.exists(_env_file):
     _env_file = os.path.expanduser("~/.env")
 load_dotenv(_env_file)
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+_gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 
 EVALUATION_PROMPT = """You are a senior code reviewer. Evaluate the following code on a 1-5 scale.
@@ -65,7 +65,7 @@ class LLMJudge:
             driver: Neo4j driver 인스턴스
         """
         self.driver = driver
-        self.model = genai.GenerativeModel("gemini-3-flash-preview")
+        self.model_name = "gemini-3-flash-preview"
 
     def evaluate_code(
         self, file_path: Optional[str] = None, code_snippet: Optional[str] = None
@@ -222,7 +222,9 @@ class LLMJudge:
         Returns:
             Gemini 응답 텍스트
         """
-        response = self.model.generate_content(prompt)
+        response = _gemini_client.models.generate_content(
+            model=self.model_name, contents=prompt
+        )
         return response.text
 
     def _parse_evaluation(self, response: str) -> Optional[Dict]:

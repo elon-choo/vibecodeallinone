@@ -12,14 +12,14 @@ import json
 import re
 from typing import Dict, Any, List, Optional
 
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 _env_file = os.path.expanduser("~/.claude/power-pack.env")
 if not os.path.exists(_env_file):
     _env_file = os.path.expanduser("~/.env")
 load_dotenv(_env_file)
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+_gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class CodeAssist:
 
     def __init__(self, driver):
         self.driver = driver
-        self.model = genai.GenerativeModel("gemini-3-flash-preview")
+        self.model_name = "gemini-3-flash-preview"
 
     def assist(self, target_function: str, instruction: str) -> Dict[str, Any]:
         """대상 함수에 대한 코드 수정 제안 생성.
@@ -210,7 +210,9 @@ class CodeAssist:
         )
 
         try:
-            response = self.model.generate_content(prompt)
+            response = _gemini_client.models.generate_content(
+                model=self.model_name, contents=prompt
+            )
             text = response.text
 
             # JSON 파싱

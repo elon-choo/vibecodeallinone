@@ -15,7 +15,7 @@ import os
 import time
 from typing import Dict, List, Optional
 
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ _env_file = os.path.expanduser("~/.claude/power-pack.env")
 if not os.path.exists(_env_file):
     _env_file = os.path.expanduser("~/.env")
 load_dotenv(_env_file)
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+_gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 DESCRIBE_PROMPT = """You are a senior developer writing concise function/class descriptions for a code search index.
 
@@ -60,7 +60,7 @@ class CodeDescriber:
 
     def __init__(self, driver, model_name: str = "gemini-3-flash-preview"):
         self.driver = driver
-        self.model = genai.GenerativeModel(model_name)
+        self.model_name = model_name
         self._request_count = 0
         self._minute_start = time.time()
 
@@ -88,7 +88,9 @@ class CodeDescriber:
 
         self._rate_limit()
         try:
-            response = self.model.generate_content(prompt)
+            response = _gemini_client.models.generate_content(
+                model=self.model_name, contents=prompt
+            )
             self._request_count += 1
             text = response.text.strip()
             # 150자 제한
@@ -121,7 +123,9 @@ class CodeDescriber:
 
         self._rate_limit()
         try:
-            response = self.model.generate_content(prompt)
+            response = _gemini_client.models.generate_content(
+                model=self.model_name, contents=prompt
+            )
             self._request_count += 1
             text = response.text.strip()
 
