@@ -150,9 +150,28 @@ class KnowledgeGraphServer:
                 self.shared_memory = SharedMemoryPool(driver)
                 self.code_assist = CodeAssist(driver)
 
+                # H-6: B-Tree 인덱스 자동 생성 (MERGE 성능 최적화)
+                self._ensure_neo4j_indexes(driver)
+
                 logger.info("Neo4j connected successfully (v2)")
             except Exception as e:
                 logger.error(f"Neo4j connection failed: {e}")
+
+    @staticmethod
+    def _ensure_neo4j_indexes(driver):
+        """Neo4j B-Tree 인덱스 자동 생성. MERGE on (name, file_path) 성능 보장."""
+        index_queries = [
+            "CREATE INDEX IF NOT EXISTS FOR (f:Function) ON (f.name, f.file_path)",
+            "CREATE INDEX IF NOT EXISTS FOR (c:Class) ON (c.name, c.file_path)",
+            "CREATE INDEX IF NOT EXISTS FOR (fi:File) ON (fi.path)",
+        ]
+        try:
+            with driver.session() as session:
+                for query in index_queries:
+                    session.run(query)
+            logger.info("Neo4j indexes verified/created (Function, Class, File)")
+        except Exception as e:
+            logger.warning(f"Neo4j index creation failed (non-fatal): {e}")
                 raise
 
     def _setup_handlers(self):

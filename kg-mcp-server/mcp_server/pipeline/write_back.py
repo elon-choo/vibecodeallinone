@@ -178,62 +178,86 @@ class GraphWriteBack:
         return result
         
     def _upsert_to_neo4j(self, result: FileParseResult, file_path: str, repo_url: str) -> Dict[str, int]:
-        """Parse result를 Neo4j에 직접 MERGE/UPDATE."""
+        """Parse result를 Neo4j에 atomic 트랜잭션으로 MERGE/UPDATE.
+
+        H-5 개선사항:
+        1. session.execute_write()로 파일 단위 atomic 트랜잭션
+        2. sync 시작 시 해당 file_path의 기존 AST 노드 DETACH DELETE 후 재생성 (ghost node 방지)
+        3. CALLS callee 매칭에 (name, file_path) 우선, fallback으로 name-only
+        """
         stats = {"functions": 0, "classes": 0, "relationships": 0}
         module_name = Path(file_path).stem
+
+        def _tx_upsert(tx):
+            nonlocal stats
+
+            # 1. Ghost Node 정리: 해당 file_path의 기존 Function/Class 노드 삭제
+            #    File 노드와 Evaluation 노드는 보존
+            tx.run("""
+                MATCH (n {file_path: $fp})
+                WHERE n:Function OR n:Class
+                DETACH DELETE n
+            """, fp=file_path)
+
+            # 2. File 노드 MERGE
+            tx.run("""
+                MERGE (f:File {path: $path})
+                SET f.language = $lang, f.repo = $repo, f.updated_at = datetime()
+            """, path=file_path, lang=result.language, repo=repo_url)
+
+            # 3. Function 노드 재생성
+            for func in result.functions:
+                tx.run("""
+                    CREATE (fn:Function {name: $name, file_path: $fp})
+                    SET fn.start_line = $sl, fn.end_line = $el,
+                        fn.code = $code, fn.docstring = $doc,
+                        fn.module = $module, fn.updated_at = datetime()
+                """, name=func.name, fp=file_path,
+                    sl=func.start_line, el=func.end_line,
+                    code=(func.code or "")[:5000], doc=func.docstring or "",
+                    module=module_name)
+                tx.run("""
+                    MATCH (f:File {path: $fp})
+                    MATCH (fn:Function {name: $name, file_path: $fp})
+                    MERGE (f)-[:DEFINES]->(fn)
+                """, fp=file_path, name=func.name)
+                stats["functions"] += 1
+
+            # 4. Class 노드 재생성
+            for cls in result.classes:
+                tx.run("""
+                    CREATE (c:Class {name: $name, file_path: $fp})
+                    SET c.start_line = $sl, c.end_line = $el,
+                        c.code = $code, c.docstring = $doc,
+                        c.module = $module, c.updated_at = datetime()
+                """, name=cls.name, fp=file_path,
+                    sl=cls.start_line, el=cls.end_line,
+                    code=(cls.code or "")[:5000], doc=cls.docstring or "",
+                    module=module_name)
+                tx.run("""
+                    MATCH (f:File {path: $fp})
+                    MATCH (c:Class {name: $name, file_path: $fp})
+                    MERGE (f)-[:DEFINES]->(c)
+                """, fp=file_path, name=cls.name)
+                stats["classes"] += 1
+
+            # 5. CALLS relationships — (name, file_path) 매칭 우선, fallback name-only
+            for func in result.functions:
+                for call_name in func.calls:
+                    tx.run("""
+                        MATCH (caller:Function {name: $caller, file_path: $fp})
+                        OPTIONAL MATCH (callee_same_file:Function {name: $callee, file_path: $fp})
+                        OPTIONAL MATCH (callee_any:Function {name: $callee})
+                        WHERE callee_any <> caller
+                        WITH caller, coalesce(callee_same_file, callee_any) AS callee
+                        WHERE callee IS NOT NULL
+                        MERGE (caller)-[:CALLS]->(callee)
+                    """, caller=func.name, fp=file_path, callee=call_name)
+                    stats["relationships"] += 1
+
         try:
             with self.driver.session() as session:
-                # File 노드
-                session.run("""
-                    MERGE (f:File {path: $path})
-                    SET f.language = $lang, f.repo = $repo, f.updated_at = datetime()
-                """, path=file_path, lang=result.language, repo=repo_url)
-
-                for func in result.functions:
-                    session.run("""
-                        MERGE (fn:Function {name: $name, file_path: $fp})
-                        SET fn.start_line = $sl, fn.end_line = $el,
-                            fn.code = $code, fn.docstring = $doc,
-                            fn.module = $module, fn.updated_at = datetime()
-                    """, name=func.name, fp=file_path,
-                        sl=func.start_line, el=func.end_line,
-                        code=(func.code or "")[:5000], doc=func.docstring or "",
-                        module=module_name)
-                    # File -> Function relationship
-                    session.run("""
-                        MATCH (f:File {path: $fp})
-                        MATCH (fn:Function {name: $name, file_path: $fp})
-                        MERGE (f)-[:DEFINES]->(fn)
-                    """, fp=file_path, name=func.name)
-                    stats["functions"] += 1
-
-                for cls in result.classes:
-                    session.run("""
-                        MERGE (c:Class {name: $name, file_path: $fp})
-                        SET c.start_line = $sl, c.end_line = $el,
-                            c.code = $code, c.docstring = $doc,
-                            c.module = $module, c.updated_at = datetime()
-                    """, name=cls.name, fp=file_path,
-                        sl=cls.start_line, el=cls.end_line,
-                        code=(cls.code or "")[:5000], doc=cls.docstring or "",
-                        module=module_name)
-                    session.run("""
-                        MATCH (f:File {path: $fp})
-                        MATCH (c:Class {name: $name, file_path: $fp})
-                        MERGE (f)-[:DEFINES]->(c)
-                    """, fp=file_path, name=cls.name)
-                    stats["classes"] += 1
-
-                # CALLS relationships from function calls
-                for func in result.functions:
-                    for call_name in func.calls:
-                        session.run("""
-                            MATCH (caller:Function {name: $caller, file_path: $fp})
-                            MATCH (callee:Function {name: $callee})
-                            MERGE (caller)-[:CALLS]->(callee)
-                        """, caller=func.name, fp=file_path, callee=call_name)
-                        stats["relationships"] += 1
-
+                session.execute_write(_tx_upsert)
         except Exception as e:
             logger.error(f"Neo4j upsert error: {e}")
         return stats
