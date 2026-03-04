@@ -6,6 +6,13 @@
   <title>Claude Code Power Pack — 12 AI Skills + Knowledge Graph MCP Server</title>
   <meta name="description" content="Clean code enforcement, vibe coding orchestration, codebase-aware reviews, and intelligent context management — all in one package for Claude Code.">
   <meta name="theme-color" content="#0a0e1a">
+  <meta property="og:title" content="Claude Code Power Pack">
+  <meta property="og:description" content="12 AI Skills + Knowledge Graph MCP Server for Claude Code">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://elon-choo.github.io/vibecodeallinone/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Claude Code Power Pack">
+  <meta name="twitter:description" content="12 AI Skills + Knowledge Graph MCP Server for Claude Code">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
   <style>
     /* ═══════════════════════════════════════════════
@@ -1189,6 +1196,46 @@
     .footer-links a:hover { color: var(--accent-primary); }
 
     /* ═══════════════════════════════════════════════
+       Copy Button for Terminal Blocks
+       ═══════════════════════════════════════════════ */
+    .terminal {
+      position: relative;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      padding: 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      z-index: 2;
+    }
+    .copy-btn:hover {
+      color: var(--accent-primary);
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+    .copy-btn.copied {
+      color: var(--success);
+      border-color: rgba(52, 211, 153, 0.3);
+      background: rgba(52, 211, 153, 0.08);
+    }
+
+    /* ═══════════════════════════════════════════════
+       Hero Install Terminal
+       ═══════════════════════════════════════════════ */
+    .hero-install-terminal {
+      margin-bottom: 48px;
+    }
+
+    /* ═══════════════════════════════════════════════
        Responsive
        ═══════════════════════════════════════════════ */
     @media (max-width: 960px) {
@@ -1304,7 +1351,6 @@
         Power Pack
       </a>
       <ul class="nav-links" id="navLinks">
-        <li><a href="#problem">Problem</a></li>
         <li><a href="#features">Skills</a></li>
         <li><a href="#kg-server">MCP Server</a></li>
         <li><a href="#install">Install</a></li>
@@ -1327,21 +1373,21 @@
     <div class="hero-grid"></div>
     <div class="container">
       <div class="hero-content">
-        <div class="hero-badge reveal">
+        <div class="hero-badge">
           <span class="hero-badge-dot"></span>
           Open Source &mdash; Free Forever
         </div>
 
-        <h1 class="hero-title reveal reveal-delay-1">
+        <h1 class="hero-title">
           <span class="hero-title-line">Your AI Coding Agent,</span>
           <span class="hero-title-line"><span class="gradient-text">Supercharged.</span></span>
         </h1>
 
-        <p class="hero-subtitle reveal reveal-delay-2">
+        <p class="hero-subtitle">
           12 AI skills + Knowledge Graph MCP server for Claude Code. Clean code enforcement, vibe coding orchestration, codebase-aware reviews, and intelligent context management &mdash; all in one package.
         </p>
 
-        <div class="hero-actions reveal reveal-delay-3">
+        <div class="hero-actions">
           <a href="https://github.com/elon-choo/vibecodeallinone" target="_blank" rel="noopener" class="btn-primary">
             <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
             Star on GitHub
@@ -1351,7 +1397,36 @@
           </a>
         </div>
 
-        <div class="hero-stats reveal reveal-delay-4">
+        <!-- Install command block -->
+        <div class="hero-install-terminal">
+          <div class="terminal" style="margin-top: 0; text-align: left; max-width: 640px; margin-left: auto; margin-right: auto;">
+            <div class="terminal-bar">
+              <div class="terminal-dot terminal-dot-red"></div>
+              <div class="terminal-dot terminal-dot-yellow"></div>
+              <div class="terminal-dot terminal-dot-green"></div>
+              <div class="terminal-title">quick install</div>
+            </div>
+            <div class="terminal-body">
+              <div class="terminal-line">
+                <span class="t-prompt">$</span>
+                <span class="t-command">git clone</span>
+                <span class="t-string">https://github.com/elon-choo/vibecodeallinone.git ~/.claude/power-pack</span>
+              </div>
+              <div class="terminal-line">
+                <span class="t-prompt">$</span>
+                <span class="t-command">cd</span>
+                <span class="t-string">~/.claude/power-pack</span>
+                <span class="t-command">&amp;&amp; bash</span>
+                <span class="t-string">scripts/install.sh</span>
+              </div>
+              <div class="terminal-line">
+                <span class="t-comment"># Done! Start a Claude Code session and try "vibe review"</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-stats">
           <div class="hero-stat">
             <div class="hero-stat-value">12</div>
             <div class="hero-stat-label">AI Skills</div>
@@ -1373,81 +1448,13 @@
     </div>
   </section>
 
-  <!-- ═══════════════════════════════ Problem ═══════════════════════════════ -->
-  <section class="problem" id="problem">
-    <div class="container">
-      <div class="section-label reveal">The Problem</div>
-      <h2 class="section-title reveal reveal-delay-1">AI coding has <span class="gradient-text">3 blind spots.</span></h2>
-      <p class="section-subtitle reveal reveal-delay-2">
-        Current AI coding tools are powerful, but they share the same fundamental weaknesses.
-      </p>
-
-      <div class="problem-grid">
-        <div class="problem-card reveal">
-          <div class="problem-icon">&#128683;</div>
-          <h3>Context Amnesia</h3>
-          <p>AI forgets your codebase structure between sessions. Every conversation starts from scratch, losing architectural decisions and conventions.</p>
-          <div class="problem-status">&#10007; No persistent memory</div>
-        </div>
-
-        <div class="problem-card reveal reveal-delay-1">
-          <div class="problem-icon">&#9888;&#65039;</div>
-          <h3>Quality Roulette</h3>
-          <p>Code quality varies wildly between prompts. No consistent enforcement of SOLID principles, security best practices, or naming conventions.</p>
-          <div class="problem-status">&#10007; Inconsistent output</div>
-        </div>
-
-        <div class="problem-card reveal reveal-delay-2">
-          <div class="problem-icon">&#128295;</div>
-          <h3>Tool Fragmentation</h3>
-          <p>Linters, reviewers, security scanners, architecture tools &mdash; each a separate setup. No unified workflow that understands your entire project.</p>
-          <div class="problem-status">&#10007; Scattered tooling</div>
-        </div>
-      </div>
-
-      <div class="connector reveal">
-        <div class="connector-arrow">&#8595;</div>
-      </div>
-
-      <!-- Solution cards inline -->
-      <div class="section-label reveal">The Solution</div>
-      <h2 class="section-title reveal reveal-delay-1">One package. <span class="gradient-text">Zero blind spots.</span></h2>
-      <p class="section-subtitle reveal reveal-delay-2">
-        Power Pack gives your AI agent a persistent knowledge graph, 12 enforcement skills, and auto-trigger hooks.
-      </p>
-
-      <div class="solution-grid">
-        <div class="solution-card reveal">
-          <div class="solution-icon">&#128752;</div>
-          <h3>Knowledge Graph</h3>
-          <p>A living graph of your codebase. Functions, classes, dependencies, and call chains &mdash; persisted across sessions with 72-77% token savings.</p>
-          <div class="solution-status">&#10003; Persistent context</div>
-        </div>
-
-        <div class="solution-card reveal reveal-delay-1">
-          <div class="solution-icon">&#128171;</div>
-          <h3>12 Enforcement Skills</h3>
-          <p>SOLID/DRY/KISS, OWASP security, naming conventions, TDD workflow, code smell detection &mdash; all enforced automatically on every change.</p>
-          <div class="solution-status">&#10003; Consistent quality</div>
-        </div>
-
-        <div class="solution-card reveal reveal-delay-2">
-          <div class="solution-icon">&#9881;&#65039;</div>
-          <h3>Auto-Trigger Hooks</h3>
-          <p>Skills activate on file save. No manual invocation needed. The orchestrator coordinates all 12 skills across 9 layers seamlessly.</p>
-          <div class="solution-status">&#10003; Unified workflow</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ═══════════════════════════════ Features / 12 Skills ═══════════════════════════════ -->
   <section class="features" id="features">
     <div class="container">
       <div class="section-label reveal">Skills</div>
       <h2 class="section-title reveal reveal-delay-1"><span class="gradient-text">12 skills</span> across 5 layers.</h2>
       <p class="section-subtitle reveal reveal-delay-2">
-        Each skill targets a specific aspect of code quality. Together, they form a comprehensive quality gate.
+        Persistent knowledge graph for cross-session memory, 12 enforcement skills for consistent quality, and auto-trigger hooks for a unified workflow. Each skill targets a specific aspect of code quality &mdash; together, they form a comprehensive quality gate.
       </p>
 
       <div class="features-layers">
@@ -2047,6 +2054,23 @@
           const top = target.getBoundingClientRect().top + window.scrollY - offset;
           window.scrollTo({ top, behavior: 'smooth' });
         }
+      });
+    });
+
+    /* ───────── Copy button for terminal blocks ───────── */
+    document.querySelectorAll('.terminal').forEach(term => {
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copy';
+      term.appendChild(btn);
+      btn.addEventListener('click', () => {
+        const lines = term.querySelectorAll('.terminal-line');
+        const text = Array.from(lines).map(l => l.textContent.trim()).filter(Boolean).join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+        });
       });
     });
   </script>
