@@ -11,10 +11,20 @@ class GraphSearcher:
 
     def __init__(self, uri: str, user: str, password: str):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        self._owns_driver = True
         logger.info(f"GraphSearcher connected to {uri}")
 
+    @classmethod
+    def from_driver(cls, driver):
+        """Use an existing Neo4j driver (shared lifecycle)."""
+        instance = cls.__new__(cls)
+        instance.driver = driver
+        instance._owns_driver = False
+        return instance
+
     def close(self):
-        self.driver.close()
+        if self._owns_driver:
+            self.driver.close()
 
     def search_all(self, query: str, limit: int = 20) -> List[Dict]:
         """전체 검색 (코드 + 패턴)"""

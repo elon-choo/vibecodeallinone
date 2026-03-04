@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 EMBEDDING_PATH = Path(__file__).parent.parent / "kg-mcp-server" / "mcp_server" / "pipeline" / "embedding_pipeline.py"
 CONFIG_PATH = Path(__file__).parent.parent / "kg-mcp-server" / "mcp_server" / "config.py"
 
@@ -38,13 +40,22 @@ def test_embedding_imports_cleanly():
     assert mod is not None, "embedding.py failed to import"
 
 
+def test_embedding_has_expected_exports():
+    """Embedding module should export recognized embed functions or classes."""
+    mod = _load_module(EMBEDDING_PATH, "_embed_export_test")
+    assert mod is not None, "embedding_pipeline failed to import"
+
+    expected_names = {"EmbeddingPipeline", "get_embedding", "embed_text", "generate_embedding"}
+    found = [n for n in dir(mod) if n in expected_names]
+    assert len(found) > 0, f"No recognized exports found in embedding_pipeline. Available: {[n for n in dir(mod) if not n.startswith('_')]}"
+
+
 def test_graceful_skip_without_voyage_key(monkeypatch):
     """Without VOYAGE_API_KEY, embedding should skip gracefully."""
     monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
 
     mod = _load_module(EMBEDDING_PATH, "_embed_test2")
-    if mod is None:
-        return
+    assert mod is not None, "embedding_pipeline should load even without VOYAGE_API_KEY"
 
     # Look for the main embed function
     embed_fn = (
@@ -54,7 +65,7 @@ def test_graceful_skip_without_voyage_key(monkeypatch):
     )
 
     if embed_fn is None:
-        return  # skip if function not found
+        pytest.skip("no embed function found — module uses class-based API")
 
     # Should return None or empty list, not crash
     try:
@@ -75,7 +86,7 @@ def test_embedding_dimensions_match_config(monkeypatch):
     embed_mod = _load_module(EMBEDDING_PATH, "_embed_dim_test")
 
     if config_mod is None or embed_mod is None:
-        return
+        pytest.skip("config or embedding module failed to load")
 
     cfg = config_mod.Config()
     assert cfg.embedding_dimensions == 1024, f"Expected 1024, got {cfg.embedding_dimensions}"

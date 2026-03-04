@@ -87,7 +87,10 @@ class LLMJudge:
         # file_path가 주어지면 파일에서 코드 읽기
         if file_path and not code:
             try:
-                expanded = os.path.expanduser(file_path)
+                expanded = os.path.realpath(os.path.expanduser(file_path))
+                cwd = os.path.realpath(os.getcwd())
+                if not expanded.startswith(cwd + os.sep) and expanded != cwd:
+                    return {"success": False, "error": f"Path not allowed (outside working directory): {file_path}"}
                 with open(expanded, "r", encoding="utf-8") as f:
                     code = f.read()
             except FileNotFoundError:

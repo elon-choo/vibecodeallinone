@@ -25,6 +25,8 @@ from neo4j import GraphDatabase
 import logging
 import re
 import time
+import threading
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +37,9 @@ def _escape_lucene(query: str) -> str:
     """Lucene fulltext 쿼리용 특수문자 이스케이프."""
     return _LUCENE_SPECIAL.sub(r'\\\1', query)
 
-# Phase 5.1: 가드레일 캐시 (5분 TTL)
+# Phase 5.1: Thread-safe 가드레일 캐시 (5분 TTL, max 100 entries)
 _guardrail_cache: Dict[str, Any] = {}
+_guardrail_cache_lock = threading.Lock()
 _GUARDRAIL_CACHE_TTL = 300  # 5 minutes
 
 
@@ -313,34 +316,29 @@ class HybridSearchEngine:
 
         기존 Full Scan → Fulltext Index 쿼리로 전환.
         동일 컨텍스트에 대해 5분 TTL 캐시 적용.
+        Thread-safe with lock.
         """
-        global _guardrail_cache
         if not results:
             return results
 
-        # 검색 컨텍스트 구성 (결과의 name + doc + module)
-        context_parts = []
-        for item in results:
-            context_parts.append(str(item.get("name", "")))
-            context_parts.append(str(item.get("doc", "")))
-            context_parts.append(str(item.get("module", "")))
-        text_context = " ".join(context_parts).strip()
-        if not text_context:
+        # 캐시 키: 결과의 name 목록만 사용 (hit rate 향상)
+        names = sorted(set(str(item.get("name", "")) for item in results if item.get("name")))
+        if not names:
             return results
+        cache_key = "|".join(names)
 
-        # 캐시 키: 컨텍스트 해시
-        import hashlib
-        cache_key = hashlib.md5(text_context.encode()).hexdigest()
-
-        # 캐시 히트 확인
-        cached = _guardrail_cache.get(cache_key)
-        if cached and (time.time() - cached["ts"]) < _GUARDRAIL_CACHE_TTL:
-            injected = cached["data"]
-            if injected:
-                return injected + results
-            return results
+        # 캐시 히트 확인 (thread-safe)
+        now = time.time()
+        with _guardrail_cache_lock:
+            cached = _guardrail_cache.get(cache_key)
+            if cached and (now - cached["ts"]) < _GUARDRAIL_CACHE_TTL:
+                injected = cached["data"]
+                if injected:
+                    return injected + results
+                return results
 
         # Fulltext Index 검색용 쿼리 구성 (주요 키워드 추출)
+        text_context = " ".join(names)
         search_terms = self._extract_keywords(text_context)[:5]
         lucene_query = " OR ".join(search_terms) if search_terms else text_context[:100]
 
@@ -368,17 +366,16 @@ class HybridSearchEngine:
                         break
         except Exception as e:
             logger.warning(f"Guardrail fulltext search failed, falling back: {e}")
-            # Fallback: keyword matching on cached keywords property
             injected = self._inject_guardrails_fallback(text_context)
 
-        # 캐시 저장
-        _guardrail_cache[cache_key] = {"ts": time.time(), "data": injected}
-
-        # 캐시 크기 제한 (최대 100 엔트리)
-        if len(_guardrail_cache) > 100:
-            oldest = sorted(_guardrail_cache, key=lambda k: _guardrail_cache[k]["ts"])
-            for k in oldest[:50]:
-                del _guardrail_cache[k]
+        # 캐시 저장 (thread-safe)
+        with _guardrail_cache_lock:
+            _guardrail_cache[cache_key] = {"ts": now, "data": injected}
+            # 캐시 크기 제한 (최대 100 엔트리)
+            if len(_guardrail_cache) > 100:
+                oldest = sorted(_guardrail_cache, key=lambda k: _guardrail_cache[k]["ts"])
+                for k in oldest[:50]:
+                    del _guardrail_cache[k]
 
         if injected:
             return injected + results
@@ -627,6 +624,9 @@ class HybridSearchEngine:
         Returns:
             호출 그래프 데이터
         """
+        # Sanitize depth to prevent Cypher injection (must be int 1-4)
+        depth = max(1, min(int(depth), 4))
+
         with self.driver.session() as session:
             # 호출하는 함수들
             calls_result = session.run(f"""

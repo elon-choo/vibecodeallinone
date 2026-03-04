@@ -10,6 +10,8 @@ import importlib.util
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 WRITE_BACK_PATH = Path(__file__).parent.parent / "kg-mcp-server" / "mcp_server" / "pipeline" / "write_back.py"
 
 
@@ -41,12 +43,12 @@ def test_no_ghost_nodes_from_empty_identifier():
     """Syncing an empty identifier should not create a ghost node."""
     mod = _load_write_back()
     if mod is None:
-        return  # skip if module can't load
+        pytest.skip("write_back module failed to load")
 
     # Look for the main sync function
     sync_fn = getattr(mod, "sync_file_to_graph", None) or getattr(mod, "sync_to_graph", None)
     if sync_fn is None:
-        return  # skip if function not found
+        pytest.skip("no sync function found in module")
 
     # Mock the Neo4j driver to capture queries
     mock_driver = MagicMock()
@@ -57,8 +59,12 @@ def test_no_ghost_nodes_from_empty_identifier():
     # This should not crash even with empty data
     try:
         sync_fn(mock_driver, "", {})
-    except (TypeError, ValueError):
-        pass  # expected for invalid input — just shouldn't crash ungracefully
+    except (TypeError, ValueError) as e:
+        # Expected: sync_fn should reject empty identifier with a clear error
+        assert "empty" in str(e).lower() or "required" in str(e).lower() or "invalid" in str(e).lower() or isinstance(e, (TypeError, ValueError)), \
+            f"Unexpected error for empty identifier: {e}"
+    except Exception as e:
+        pytest.fail(f"Unexpected exception type for empty identifier: {type(e).__name__}: {e}")
 
 
 def test_graceful_skip_without_neo4j(monkeypatch):
@@ -68,7 +74,7 @@ def test_graceful_skip_without_neo4j(monkeypatch):
 
     mod = _load_write_back()
     if mod is None:
-        return
+        pytest.skip("write_back module failed to load (expected without Neo4j)")
 
     # Module should load without attempting Neo4j connection at import time
     assert mod is not None

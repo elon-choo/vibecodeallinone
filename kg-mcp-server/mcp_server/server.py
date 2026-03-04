@@ -104,6 +104,7 @@ class KnowledgeGraphServer:
 
         # v2 컴포넌트
         self.query_router = QueryRouter()
+        self._neo4j_driver = None  # track driver for cleanup
         self.hybrid_search = None
         self.write_back = None
         self.impact_simulator = None
@@ -118,23 +119,27 @@ class KnowledgeGraphServer:
 
         self._setup_handlers()
 
+    @staticmethod
+    async def _run_sync(func, *args, **kwargs):
+        """Run a blocking function in a thread to avoid blocking the event loop."""
+        return await asyncio.to_thread(func, *args, **kwargs)
+
     def _connect_neo4j(self):
-        """Neo4j 연결 (lazy)"""
+        """Neo4j 연결 (lazy) — single shared driver"""
         if self.searcher is None:
             try:
                 from neo4j import GraphDatabase
 
-                self.searcher = GraphSearcher(
-                    config.neo4j_uri,
-                    config.neo4j_user,
-                    config.neo4j_password
-                )
-
-                # v2: 하이브리드 검색 엔진 초기화
+                # Single shared driver for all components
                 driver = GraphDatabase.driver(
                     config.neo4j_uri,
                     auth=(config.neo4j_user, config.neo4j_password)
                 )
+                self._neo4j_driver = driver
+
+                self.searcher = GraphSearcher.from_driver(driver)
+
+                # v2: 하이브리드 검색 엔진 초기화
                 self.hybrid_search = HybridSearchEngine(driver)
                 self.write_back = GraphWriteBack(driver)
                 self.impact_simulator = ImpactSimulator(driver)
@@ -156,6 +161,7 @@ class KnowledgeGraphServer:
                 logger.info("Neo4j connected successfully (v2)")
             except Exception as e:
                 logger.error(f"Neo4j connection failed: {e}")
+                raise ConnectionError(f"Neo4j connection failed: {e}") from e
 
     @staticmethod
     def _ensure_neo4j_indexes(driver):
@@ -629,95 +635,46 @@ class KnowledgeGraphServer:
             correlation_id = log_mcp_request(name, arguments)
 
             try:
-                if name == "search_knowledge":
-                    result = await self._search_knowledge(arguments)
-                elif name == "get_function_context":
-                    result = await self._get_function_context(arguments)
-                elif name == "get_module_structure":
-                    result = await self._get_module_structure(arguments)
-                elif name == "get_security_patterns":
-                    result = await self._get_security_patterns()
-                elif name == "get_graph_stats":
-                    result = await self._get_graph_stats()
-                elif name == "smart_context":
-                    result = await self._smart_context(arguments)
-                # v2.0 신규 도구
-                elif name == "hybrid_search":
-                    result = await self._hybrid_search(arguments)
-                elif name == "get_call_graph":
-                    result = await self._get_call_graph(arguments)
-                elif name == "get_similar_code":
-                    result = await self._get_similar_code(arguments)
-                elif name == "get_cache_stats":
-                    result = await self._get_cache_stats_v2()
-                # v2.2 분석 도구
-                elif name == "get_analytics_summary":
-                    result = await self._get_analytics_summary()
-                elif name == "get_top_referenced":
-                    result = await self._get_top_referenced(arguments)
-                elif name == "get_recent_activity":
-                    result = await self._get_recent_activity(arguments)
-                
-                
-                
-                elif name == "get_session_context":
-                    result = await self._get_session_context(arguments)
+                # Tool dispatch table — replaces if-elif chain for maintainability
+                _TOOL_DISPATCH = {
+                    "search_knowledge": self._search_knowledge,
+                    "get_function_context": self._get_function_context,
+                    "get_module_structure": self._get_module_structure,
+                    "get_security_patterns": lambda _: self._get_security_patterns(),
+                    "get_graph_stats": lambda _: self._get_graph_stats(),
+                    "smart_context": self._smart_context,
+                    "hybrid_search": self._hybrid_search,
+                    "get_call_graph": self._get_call_graph,
+                    "get_similar_code": self._get_similar_code,
+                    "get_cache_stats": lambda _: self._get_cache_stats_v2(),
+                    "get_analytics_summary": lambda _: self._get_analytics_summary(),
+                    "get_top_referenced": self._get_top_referenced,
+                    "get_recent_activity": self._get_recent_activity,
+                    "get_session_context": self._get_session_context,
+                    "evolve_ontology": self._evolve_ontology,
+                    "promote_pattern": self._promote_pattern,
+                    "get_global_insights": self._get_global_insights,
+                    "suggest_tests": self._suggest_tests,
+                    "get_bug_hotspots": self._get_bug_hotspots,
+                    "provide_feedback": self._provide_feedback,
+                    "simulate_impact": self._simulate_impact,
+                    "sync_incremental": self._sync_incremental,
+                    "evaluate_code": self._evaluate_code,
+                    "semantic_search": self._semantic_search,
+                    "ask_codebase": self._ask_codebase,
+                    "generate_docs": self._generate_docs,
+                    "assist_code": self._assist_code,
+                    "get_shared_context": self._get_shared_context,
+                    "publish_context": self._publish_context,
+                    "get_quality_report": lambda _: self._get_quality_report(),
+                    "index_project": self._index_project,
+                }
 
-                elif name == "evolve_ontology":
-                    result = await self._evolve_ontology(arguments)
-
-                elif name == "promote_pattern":
-                    result = await self._promote_pattern(arguments)
-
-                elif name == "get_global_insights":
-                    result = await self._get_global_insights(arguments)
-
-                elif name == "suggest_tests":
-                    result = await self._suggest_tests(arguments)
-
-                elif name == "get_bug_hotspots":
-                    result = await self._get_bug_hotspots(arguments)
-
-                elif name == "provide_feedback":
-                    result_text = await self._provide_feedback(arguments)
-                    log_search_event(name, arguments, "weight_learner", len(result_text), time.perf_counter() - start_time)
-
-                elif name == "simulate_impact":
-                    result_text = await self._simulate_impact(arguments)
-                    log_search_event(name, arguments, "impact_simulator", len(result_text), time.perf_counter() - start_time)
-
-                elif name == "sync_incremental":
-                    result_text = await self._sync_incremental(arguments)
-                    log_search_event(name, arguments, "write_back", len(result_text), time.perf_counter() - start_time)
-
-                elif name == "evaluate_code":
-                    result = await self._evaluate_code(arguments)
-
-                elif name == "semantic_search":
-                    result = await self._semantic_search(arguments)
-
-                elif name == "ask_codebase":
-                    result = await self._ask_codebase(arguments)
-
-                elif name == "generate_docs":
-                    result = await self._generate_docs(arguments)
-
-                elif name == "assist_code":
-                    result = await self._assist_code(arguments)
-
-                elif name == "get_shared_context":
-                    result = await self._get_shared_context(arguments)
-
-                elif name == "publish_context":
-                    result = await self._publish_context(arguments)
-
-                elif name == "get_quality_report":
-                    result = await self._get_quality_report()
-
-                elif name == "index_project":
-                    result = await self._index_project(arguments)
-                else:
+                handler = _TOOL_DISPATCH.get(name)
+                if handler is None:
                     result = f"Unknown tool: {name}"
+                else:
+                    result = await handler(arguments)
 
                 # v2.1: 성공 메트릭 기록
                 duration = time.perf_counter() - start_time
@@ -797,11 +754,11 @@ class KnowledgeGraphServer:
         limit = args.get("limit", 10)
 
         if search_type == "code":
-            results = self.searcher.search_code(query, limit * 2)
+            results = await self._run_sync(self.searcher.search_code, query, limit * 2)
         elif search_type == "pattern":
-            results = self.searcher.search_patterns(query, limit * 2)
+            results = await self._run_sync(self.searcher.search_patterns, query, limit * 2)
         else:
-            results = self.searcher.search_all(query, limit * 2)
+            results = await self._run_sync(self.searcher.search_all, query, limit * 2)
 
         # 리랭킹
         reranked = self.reranker.rerank(query, results, limit)
@@ -817,7 +774,7 @@ class KnowledgeGraphServer:
     async def _get_function_context(self, args: dict) -> str:
         """함수 컨텍스트 조회"""
         func_name = args.get("function_name", "")
-        func_data = self.searcher.get_function_context(func_name)
+        func_data = await self._run_sync(self.searcher.get_function_context, func_name)
 
         # v2.2: 참조 추적
         if func_data:
@@ -832,17 +789,17 @@ class KnowledgeGraphServer:
     async def _get_module_structure(self, args: dict) -> str:
         """모듈 구조 조회"""
         module_name = args.get("module_name", "")
-        module_data = self.searcher.get_module_structure(module_name)
+        module_data = await self._run_sync(self.searcher.get_module_structure, module_name)
         return self.builder.build_module_context(module_data)
 
     async def _get_security_patterns(self) -> str:
         """보안 패턴 조회"""
-        security_data = self.searcher.get_security_recommendations()
+        security_data = await self._run_sync(self.searcher.get_security_recommendations)
         return self.builder._build_security_section(security_data)
 
     async def _get_graph_stats(self) -> str:
         """그래프 통계"""
-        stats = self.searcher.get_graph_stats()
+        stats = await self._run_sync(self.searcher.get_graph_stats)
 
         lines = ["# 지식그래프 통계\n"]
 
@@ -868,10 +825,10 @@ class KnowledgeGraphServer:
 
         all_results = []
 
-        # 각 키워드로 검색
+        # 각 키워드로 검색 (non-blocking)
         for keyword in keywords:
-            code_results = self.searcher.search_code(keyword, 5)
-            pattern_results = self.searcher.search_patterns(keyword, 3)
+            code_results = await self._run_sync(self.searcher.search_code, keyword, 5)
+            pattern_results = await self._run_sync(self.searcher.search_patterns, keyword, 3)
             all_results.extend(code_results)
             all_results.extend(pattern_results)
 
@@ -916,8 +873,8 @@ class KnowledgeGraphServer:
         # 검색 전략 결정 (Local/Global/Hybrid)
         strategy = self.query_router.get_search_strategy(query)
 
-        # 하이브리드 검색 실행
-        results = self.hybrid_search.search(query, strategy, limit)
+        # 하이브리드 검색 실행 (non-blocking)
+        results = await self._run_sync(self.hybrid_search.search, query, strategy, limit)
 
         # 결과 포맷팅
         lines = [
@@ -1300,11 +1257,17 @@ class KnowledgeGraphServer:
         """실시간 파일 동기화"""
         if not self.write_back:
             return "GraphWriteBack is not initialized."
-            
+
         file_path = args.get("file_path")
         if not file_path:
             return "Error: file_path is required"
-            
+
+        # Path traversal 방어: resolve 후 실제 존재하는 파일인지 검증
+        resolved = Path(file_path).resolve()
+        if not resolved.is_file():
+            return f"Error: '{file_path}' is not a valid file"
+        file_path = str(resolved)
+
         result = self.write_back.sync_file(file_path)
         
         if result.get("success"):
@@ -1855,6 +1818,22 @@ class KnowledgeGraphServer:
 
         return "\n".join(lines)
 
+    def close(self):
+        """Neo4j 드라이버 및 리소스 정리"""
+        if self._neo4j_driver is not None:
+            try:
+                self._neo4j_driver.close()
+                logger.info("Neo4j driver closed")
+            except Exception as e:
+                logger.warning(f"Error closing Neo4j driver: {e}")
+            self._neo4j_driver = None
+        if self.searcher is not None:
+            try:
+                self.searcher.close()
+            except Exception:
+                pass
+            self.searcher = None
+
     async def run(self):
         """서버 실행"""
         # v2.1: Prometheus 메트릭 서버 시작
@@ -1882,7 +1861,10 @@ class KnowledgeGraphServer:
 async def main():
     """메인 함수"""
     server = KnowledgeGraphServer()
-    await server.run()
+    try:
+        await server.run()
+    finally:
+        server.close()
 
 
 if __name__ == "__main__":

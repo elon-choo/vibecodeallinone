@@ -42,7 +42,10 @@ for skill_dir in "$ROOT_DIR/skills"/*/; do
 
   if [ -d "$SKILLS_DIR/$skill_name" ]; then
     echo "  Updating: $skill_name"
-    rm -rf "$SKILLS_DIR/${skill_name}.bak" 2>/dev/null
+    # Safe backup: verify target is under SKILLS_DIR before removing
+    if [ -d "$SKILLS_DIR/${skill_name}.bak" ] && [[ "$SKILLS_DIR/${skill_name}.bak" == "${HOME}/.claude/skills/"* ]]; then
+      rm -rf "$SKILLS_DIR/${skill_name}.bak"
+    fi
     mv "$SKILLS_DIR/$skill_name" "$SKILLS_DIR/${skill_name}.bak"
   else
     echo "  Installing: $skill_name"
@@ -78,7 +81,7 @@ cp -r "$ROOT_DIR/kg-mcp-server/"* "$KG_DEST/"
 echo "  Creating Python virtual environment..."
 python3 -m venv "$KG_DEST/venv"
 source "$KG_DEST/venv/bin/activate"
-pip install -q -r "$KG_DEST/requirements.txt" 2>/dev/null
+pip install -r "$KG_DEST/requirements.txt"
 deactivate
 
 # Copy .env.example if no .env exists
@@ -108,9 +111,53 @@ echo -e "${GREEN}  KG MCP Server installed at $KG_DEST${NC}"
 echo -e "${GREEN}  Launcher: $KG_DEST/run.sh${NC}"
 echo ""
 
+# Auto-register MCP server in settings.json
+SETTINGS_FILE="${HOME}/.claude/settings.json"
+if [ -f "$SETTINGS_FILE" ]; then
+  # Check if already registered
+  if ! grep -q "neo4j-knowledge-graph" "$SETTINGS_FILE" 2>/dev/null; then
+    echo "  Registering MCP server in settings.json..."
+    python3 -c "
+import json, sys
+try:
+    with open('$SETTINGS_FILE', 'r') as f:
+        settings = json.load(f)
+    if 'mcpServers' not in settings:
+        settings['mcpServers'] = {}
+    settings['mcpServers']['neo4j-knowledge-graph'] = {
+        'command': '$KG_DEST/run.sh',
+        'args': [],
+        'env': {}
+    }
+    with open('$SETTINGS_FILE', 'w') as f:
+        json.dump(settings, f, indent=2)
+    print('  MCP server registered successfully')
+except Exception as e:
+    print(f'  Warning: could not auto-register MCP server: {e}', file=sys.stderr)
+"
+  else
+    echo "  MCP server already registered in settings.json"
+  fi
+else
+  # Create settings.json with MCP server entry
+  echo "  Creating settings.json with MCP server registration..."
+  mkdir -p "$(dirname "$SETTINGS_FILE")"
+  cat > "$SETTINGS_FILE" << SETTINGS
+{
+  "mcpServers": {
+    "neo4j-knowledge-graph": {
+      "command": "$KG_DEST/run.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+SETTINGS
+  echo -e "${GREEN}  MCP server registered in settings.json${NC}"
+fi
+
 if [ "$TIER" -lt 3 ]; then
-  echo "Done! Configure your MCP server in ~/.claude/settings.json"
-  echo "Edit ~/.claude/power-pack.env with your Neo4j + API credentials"
+  echo "Done! MCP server registered. Edit ~/.claude/power-pack.env with your API keys."
   exit 0
 fi
 

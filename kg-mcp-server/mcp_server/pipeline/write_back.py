@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -123,10 +124,18 @@ class GraphWriteBack:
 
     def _parse_python_ast(self, file_path: str):
         """간단한 Python AST 기반 파서 (tree-sitter 에러 우회용)"""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            code = f.read()
-            
-        tree = ast.parse(code)
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                code = f.read()
+        except (PermissionError, OSError) as e:
+            logger.warning(f"Cannot read {file_path}: {e}")
+            return None
+
+        try:
+            tree = ast.parse(code)
+        except SyntaxError as e:
+            logger.warning(f"SyntaxError parsing {file_path}: {e}")
+            return None
         
         result = FileParseResult(file_path=file_path, language="python")
         
@@ -189,24 +198,32 @@ class GraphWriteBack:
         def _tx_upsert(tx):
             nonlocal stats
 
-            # 1. Ghost Node 정리: 해당 file_path의 기존 Function/Class 노드 삭제
-            #    File 노드와 Evaluation 노드는 보존
-            tx.run("""
-                MATCH (n {file_path: $fp})
-                WHERE n:Function OR n:Class
-                DETACH DELETE n
-            """, fp=file_path)
+            # 1. Collect current entity names for stale node cleanup later
+            current_func_names = {func.name for func in result.functions}
+            current_class_names = {cls.name for cls in result.classes}
 
-            # 2. File 노드 MERGE
+            # 2. Remove stale nodes (entities no longer in file) — preserves external CALLS
+            tx.run("""
+                MATCH (n:Function {file_path: $fp})
+                WHERE NOT n.name IN $keep_names
+                DETACH DELETE n
+            """, fp=file_path, keep_names=list(current_func_names))
+            tx.run("""
+                MATCH (n:Class {file_path: $fp})
+                WHERE NOT n.name IN $keep_names
+                DETACH DELETE n
+            """, fp=file_path, keep_names=list(current_class_names))
+
+            # 3. File 노드 MERGE
             tx.run("""
                 MERGE (f:File {path: $path})
                 SET f.language = $lang, f.repo = $repo, f.updated_at = datetime()
             """, path=file_path, lang=result.language, repo=repo_url)
 
-            # 3. Function 노드 재생성
+            # 4. Function 노드 MERGE (preserves incoming CALLS from other files)
             for func in result.functions:
                 tx.run("""
-                    CREATE (fn:Function {name: $name, file_path: $fp})
+                    MERGE (fn:Function {name: $name, file_path: $fp})
                     SET fn.start_line = $sl, fn.end_line = $el,
                         fn.code = $code, fn.docstring = $doc,
                         fn.module = $module, fn.updated_at = datetime()
@@ -221,10 +238,10 @@ class GraphWriteBack:
                 """, fp=file_path, name=func.name)
                 stats["functions"] += 1
 
-            # 4. Class 노드 재생성
+            # 5. Class 노드 MERGE (preserves external relationships)
             for cls in result.classes:
                 tx.run("""
-                    CREATE (c:Class {name: $name, file_path: $fp})
+                    MERGE (c:Class {name: $name, file_path: $fp})
                     SET c.start_line = $sl, c.end_line = $el,
                         c.code = $code, c.docstring = $doc,
                         c.module = $module, c.updated_at = datetime()
@@ -239,7 +256,12 @@ class GraphWriteBack:
                 """, fp=file_path, name=cls.name)
                 stats["classes"] += 1
 
-            # 5. CALLS relationships — (name, file_path) 매칭 우선, fallback name-only
+            # 6. Remove stale outgoing CALLS from this file's functions, then recreate
+            tx.run("""
+                MATCH (caller:Function {file_path: $fp})-[r:CALLS]->()
+                DELETE r
+            """, fp=file_path)
+
             for func in result.functions:
                 for call_name in func.calls:
                     tx.run("""
@@ -262,7 +284,10 @@ class GraphWriteBack:
 
     def sync_file(self, file_path: str, repo_url: str = "local") -> Dict[str, Any]:
         """단일 파일의 변경사항을 구문분석하여 Neo4j에 즉시 반영"""
-        path = Path(file_path)
+        path = Path(file_path).resolve()
+        cwd = Path.cwd().resolve()
+        if not (path == cwd or str(path).startswith(str(cwd) + os.sep)):
+            return {"success": False, "error": f"Path not allowed (outside working directory): {file_path}"}
         if not path.exists():
             return {"success": False, "error": f"File not found: {file_path}"}
             

@@ -452,6 +452,41 @@ def auto_commit(round_num: int) -> bool:
         return False
 
 
+# ── AI Review Fix Prompts ────────────────────────────────
+
+def _generate_ai_review_fix_prompts(reviews: list) -> list:
+    """Generate fix prompts from AI review CRITICAL/HIGH issues."""
+    prompts = []
+    for r in reviews:
+        perspective = r.get("perspective", "unknown")
+        critical_issues = [
+            i for i in r.get("issues", [])
+            if i.get("severity") in ("CRITICAL", "HIGH")
+        ]
+        if not critical_issues:
+            continue
+
+        issues_text = "\n".join(
+            f"  - [{i['severity']}] {i.get('file', '?')}: {i.get('description', '?')[:200]}"
+            for i in critical_issues[:8]
+        )
+        prompts.append({
+            "id": f"fix_ai_{perspective}",
+            "priority": 0,
+            "prompt": (
+                f"Fix the following {perspective} issues in the vibecodeallinone project.\n"
+                f"Project root: {REPO_ROOT}\n\n"
+                f"Issues to fix (from AI review):\n{issues_text}\n\n"
+                f"Focus on CRITICAL issues first. Make minimal, targeted changes. "
+                f"Do NOT refactor entire files — fix only what's listed above. "
+                f"After fixing, verify the changes don't break anything."
+            ),
+        })
+
+    prompts.sort(key=lambda p: p["priority"])
+    return prompts
+
+
 # ── Main Loop ──────────────────────────────────────────────
 
 def main():
@@ -560,14 +595,27 @@ def main():
                 "fixes": [r.get("perspective", "?") for r in reviews],
             })
 
-            # If AI review found CRITICAL issues → generate fix prompts for next round
+            # If AI review found CRITICAL issues → generate fix prompts for this round
             critical_issues = [
                 i for r in reviews
                 for i in r.get("issues", [])
                 if i.get("severity") == "CRITICAL"
             ]
             if critical_issues:
-                log(f"AI Review found {len(critical_issues)} CRITICAL issues → will fix in next round", "WARN")
+                log(f"AI Review found {len(critical_issues)} CRITICAL issues → attempting auto-fix", "WARN")
+
+                # Group critical issues by perspective for focused fixes
+                fix_prompts_ai = _generate_ai_review_fix_prompts(reviews)
+                for fix_prompt in fix_prompts_ai[:args.fix_limit]:
+                    call_claude(
+                        prompt=fix_prompt["prompt"],
+                        task_id=fix_prompt["id"],
+                        model=args.model,
+                        dry_run=args.dry_run,
+                    )
+
+                if args.auto_commit and not args.dry_run:
+                    auto_commit(round_num)
 
             score = new_score
 
@@ -576,9 +624,11 @@ def main():
             log(f"Score {score} >= target {args.stop_score}. Done!", "OK")
             break
 
-        if not prompts and ai_review_score > 0:
-            log("No more actionable fixes. Manual intervention needed for remaining points.", "WARN")
-            break
+        if not prompts and ai_review_done:
+            # No gate failures remain, continue to next round for re-review
+            log("Gates clean, will re-run AI review in next round to measure improvement.", "INFO")
+            ai_review_done = False  # allow re-review next round
+            continue
 
     # ── Final Summary ──
     elapsed = time.time() - start_time
