@@ -557,18 +557,18 @@ def main():
         watcher = KGFileWatcher(watch_dirs=[])
         projects = watcher.list_projects()
         if not projects:
-            print("No watched projects configured.")
-            print(f"Config file: {CONFIG_PATH}")
+            print("No watched projects configured.", file=sys.stderr)
+            print(f"Config file: {CONFIG_PATH}", file=sys.stderr)
         else:
-            print(f"Watched projects ({len(projects)}):")
-            print(f"{'─' * 60}")
+            print(f"Watched projects ({len(projects)}):", file=sys.stderr)
+            print(f"{'─' * 60}", file=sys.stderr)
             for p in projects:
                 status = "enabled" if p.get("enabled", True) else "disabled"
                 exists = "OK" if os.path.isdir(p["path"]) else "NOT FOUND"
-                print(f"  [{status}] {p['path']}")
-                print(f"           namespace={p.get('namespace', '?')}  dir={exists}")
-            print(f"{'─' * 60}")
-            print(f"Config: {CONFIG_PATH}")
+                print(f"  [{status}] {p['path']}", file=sys.stderr)
+                print(f"           namespace={p.get('namespace', '?')}  dir={exists}", file=sys.stderr)
+            print(f"{'─' * 60}", file=sys.stderr)
+            print(f"Config: {CONFIG_PATH}", file=sys.stderr)
         return
 
     # --add: 프로젝트 추가 후 종료
@@ -576,9 +576,9 @@ def main():
         watcher = KGFileWatcher(watch_dirs=[])
         result = watcher.add_project(args.add)
         if result["added"]:
-            print(f"Added: {result['path']} (namespace={result['namespace']})")
+            print(f"Added: {result['path']} (namespace={result['namespace']})", file=sys.stderr)
         else:
-            print(f"Already exists: {result['path']} (namespace={result['namespace']})")
+            print(f"Already exists: {result['path']} (namespace={result['namespace']})", file=sys.stderr)
         return
 
     # --remove: 프로젝트 제거 후 종료
@@ -586,9 +586,9 @@ def main():
         watcher = KGFileWatcher(watch_dirs=[])
         result = watcher.remove_project(args.remove)
         if result["removed"]:
-            print(f"Removed: {result['path']}")
+            print(f"Removed: {result['path']}", file=sys.stderr)
         else:
-            print(f"Not found in config: {result['path']}")
+            print(f"Not found in config: {result['path']}", file=sys.stderr)
         return
 
     # 기본: 감시 모드

@@ -87,7 +87,25 @@ if [ ! -f "${HOME}/.claude/power-pack.env" ]; then
   echo -e "${YELLOW}  Created ~/.claude/power-pack.env - edit with your API keys${NC}"
 fi
 
+# Create launcher script that forces venv python
+cat > "$KG_DEST/run.sh" << 'LAUNCHER'
+#!/bin/bash
+# KG MCP Server Launcher - ensures venv python is used
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PYTHON="$SCRIPT_DIR/venv/bin/python"
+
+if [ ! -f "$VENV_PYTHON" ]; then
+  echo "Error: venv not found at $SCRIPT_DIR/venv" >&2
+  echo "Run the installer again: bash scripts/install.sh 2" >&2
+  exit 1
+fi
+
+exec "$VENV_PYTHON" -m mcp_server.server "$@"
+LAUNCHER
+chmod +x "$KG_DEST/run.sh"
+
 echo -e "${GREEN}  KG MCP Server installed at $KG_DEST${NC}"
+echo -e "${GREEN}  Launcher: $KG_DEST/run.sh${NC}"
 echo ""
 
 if [ "$TIER" -lt 3 ]; then

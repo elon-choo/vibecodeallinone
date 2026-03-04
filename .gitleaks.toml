@@ -13,7 +13,6 @@ stopwords = [
     "example",
     "placeholder",
     "your-api-key-here",
-    "test",
     "dummy",
     "sample",
 ]

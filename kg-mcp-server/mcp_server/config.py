@@ -3,6 +3,15 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# power-pack.env에서 환경변수 로드 (fallback: ~/.env)
+_env_file = os.path.expanduser("~/.claude/power-pack.env")
+if not os.path.exists(_env_file):
+    _env_file = os.path.expanduser("~/.env")
+if os.path.exists(_env_file):
+    load_dotenv(_env_file)
+
 @dataclass
 class Config:
     """서버 설정"""

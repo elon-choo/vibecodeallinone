@@ -10,3 +10,9 @@ venv/
 .venv/
 .pytest_cache/
 tests/__pycache__/
+power-pack.env
+*.pem
+*.key
+*.p12
+*.pfx
+.claude/

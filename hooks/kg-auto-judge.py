@@ -165,7 +165,7 @@ def _run_judge(file_path: str) -> dict:
     """LLM Judge를 호출하여 코드 품질 평가. Gemini Flash 사용."""
     try:
         # 프로젝트 경로를 sys.path에 추가
-        kg_path = os.getenv("KG_MCP_ROOT", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        kg_path = os.getenv("KG_MCP_ROOT", str(Path.home() / ".claude" / "kg-mcp-server"))
         if kg_path not in sys.path:
             sys.path.insert(0, kg_path)
 

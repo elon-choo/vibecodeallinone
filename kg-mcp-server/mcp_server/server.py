@@ -19,12 +19,18 @@ v2.0 업그레이드:
 """
 
 import asyncio
+import io
 import json
 import logging
 import sys
 import time
 import os
 from pathlib import Path
+
+# MCP Stdout 오염 방어: 모든 print()를 stderr로 리다이렉트
+# MCP JSON-RPC는 stdout을 사용하므로 print()가 프로토콜을 깨뜨림
+_original_stdout = sys.stdout
+sys.stdout = sys.stderr
 
 # 프로젝트 루트 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -1843,7 +1849,11 @@ class KnowledgeGraphServer:
 
         logger.info("Starting MCP Knowledge Graph Server v2.1...")
 
+        # MCP JSON-RPC가 원래 stdout을 사용할 수 있도록 복원
+        sys.stdout = _original_stdout
         async with stdio_server() as (read_stream, write_stream):
+            # stdio_server가 스트림을 캡처한 후 다시 stderr로 리다이렉트
+            sys.stdout = sys.stderr
             await self.server.run(
                 read_stream,
                 write_stream,
