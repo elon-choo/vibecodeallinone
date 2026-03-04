@@ -1,0 +1,76 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the Power Pack is affected?
+      options:
+        - Skills (vibe-review, clean-code, etc.)
+        - KG MCP Server
+        - Hooks (auto-trigger, indexer, etc.)
+        - Landing Page / Docs
+        - Installation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug
+      placeholder: Describe the unexpected behavior...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Install Power Pack with tier 2
+        2. Start Claude Code session
+        3. Run 'vibe review'
+        4. See error...
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Installation tier
+      options:
+        - Tier 1 (Skills only)
+        - Tier 2 (Skills + KG MCP)
+        - Tier 3 (Full with hooks)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / Environment
+      placeholder: "macOS 15.2, Python 3.12, Neo4j 5.x"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any error messages or logs
+      render: shell
