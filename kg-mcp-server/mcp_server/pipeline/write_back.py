@@ -52,9 +52,14 @@ TS_SUPPORTED_EXTS = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.go', '.rs'}
 class GraphWriteBack:
     """실시간 그래프 업데이트 시스템"""
 
+    # Max file size for parsing (10 MB) to prevent OOM on malicious files
+    MAX_FILE_SIZE = 10 * 1024 * 1024
+
     def __init__(self, driver):
         self.driver = driver
         self._ts_parser = None
+        # Capture allowed base directory at init time (not at request time)
+        self._allowed_base = Path.cwd().resolve()
 
     def _get_ts_parser(self):
         """TreeSitterParser 인스턴스 (lazy init)."""
@@ -70,6 +75,14 @@ class GraphWriteBack:
         """tree-sitter 기반 파서로 파일 파싱 후 FileParseResult로 변환."""
         parser = self._get_ts_parser()
         if parser is None:
+            return None
+
+        try:
+            file_size = os.path.getsize(file_path)
+            if file_size > self.MAX_FILE_SIZE:
+                logger.warning(f"File too large to parse ({file_size} bytes): {file_path}")
+                return None
+        except OSError:
             return None
 
         entities = parser.parse_file(file_path)
@@ -125,6 +138,10 @@ class GraphWriteBack:
     def _parse_python_ast(self, file_path: str):
         """간단한 Python AST 기반 파서 (tree-sitter 에러 우회용)"""
         try:
+            file_size = os.path.getsize(file_path)
+            if file_size > self.MAX_FILE_SIZE:
+                logger.warning(f"File too large to parse ({file_size} bytes): {file_path}")
+                return None
             with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                 code = f.read()
         except (PermissionError, OSError) as e:
@@ -285,10 +302,10 @@ class GraphWriteBack:
     def sync_file(self, file_path: str, repo_url: str = "local") -> Dict[str, Any]:
         """단일 파일의 변경사항을 구문분석하여 Neo4j에 즉시 반영"""
         path = Path(file_path).resolve()
-        cwd = Path.cwd().resolve()
-        if not (path == cwd or str(path).startswith(str(cwd) + os.sep)):
+        base = self._allowed_base
+        if not (path == base or path.is_relative_to(base)):
             return {"success": False, "error": f"Path not allowed (outside working directory): {file_path}"}
-        if not path.exists():
+        if not path.is_file():
             return {"success": False, "error": f"File not found: {file_path}"}
             
         try:

@@ -19,22 +19,22 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from neo4j import GraphDatabase
 
+from mcp_server.config import config
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="KG Dashboard v5", version="5.0")
 
-# Neo4j connection
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USERNAME", "neo4j")
-NEO4J_PASS = os.getenv("NEO4J_PASSWORD", "")
-
+# Neo4j connection — use shared Config to avoid parameter divergence
 driver = None
 
 
 def get_driver():
     global driver
     if driver is None:
-        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
+        driver = GraphDatabase.driver(
+            config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password)
+        )
     return driver
 
 

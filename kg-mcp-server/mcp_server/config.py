@@ -1,9 +1,12 @@
 """MCP 서버 설정"""
 import os
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # power-pack.env에서 환경변수 로드 (fallback: ~/.env)
 _env_file = os.path.expanduser("~/.claude/power-pack.env")
@@ -49,7 +52,10 @@ class Config:
 
     @property
     def neo4j_password(self) -> str:
-        return _get_env("NEO4J_PASSWORD", "")
+        pw = _get_env("NEO4J_PASSWORD", "")
+        if not pw:
+            logger.warning("NEO4J_PASSWORD is empty — authentication will likely fail. Set NEO4J_PASSWORD env var.")
+        return pw
 
     @property
     def voyage_api_key(self) -> str:

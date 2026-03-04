@@ -627,26 +627,23 @@ class HybridSearchEngine:
         # Sanitize depth to prevent Cypher injection (must be int 1-4)
         depth = max(1, min(int(depth), 4))
 
-        with self.driver.session() as session:
-            # 호출하는 함수들
-            calls_result = session.run(f"""
-                MATCH path = (f:Function)-[:CALLS*1..{depth}]->(called:Function)
-                WHERE f.name = $name OR f.qualified_name CONTAINS $name
-                RETURN
-                    [node in nodes(path) | node.name] as path,
-                    length(path) as depth
-                LIMIT 20
-            """, name=func_name)
+        # Pre-defined safe Cypher templates keyed by validated depth (no interpolation)
+        _OUTGOING_QUERIES = {
+            1: "MATCH path = (f:Function)-[:CALLS*1..1]->(called:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+            2: "MATCH path = (f:Function)-[:CALLS*1..2]->(called:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+            3: "MATCH path = (f:Function)-[:CALLS*1..3]->(called:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+            4: "MATCH path = (f:Function)-[:CALLS*1..4]->(called:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+        }
+        _INCOMING_QUERIES = {
+            1: "MATCH path = (caller:Function)-[:CALLS*1..1]->(f:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+            2: "MATCH path = (caller:Function)-[:CALLS*1..2]->(f:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+            3: "MATCH path = (caller:Function)-[:CALLS*1..3]->(f:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+            4: "MATCH path = (caller:Function)-[:CALLS*1..4]->(f:Function) WHERE f.name = $name OR f.qualified_name CONTAINS $name RETURN [node in nodes(path) | node.name] as path, length(path) as depth LIMIT 20",
+        }
 
-            # 호출되는 함수들
-            callers_result = session.run(f"""
-                MATCH path = (caller:Function)-[:CALLS*1..{depth}]->(f:Function)
-                WHERE f.name = $name OR f.qualified_name CONTAINS $name
-                RETURN
-                    [node in nodes(path) | node.name] as path,
-                    length(path) as depth
-                LIMIT 20
-            """, name=func_name)
+        with self.driver.session() as session:
+            calls_result = session.run(_OUTGOING_QUERIES[depth], name=func_name)
+            callers_result = session.run(_INCOMING_QUERIES[depth], name=func_name)
 
             return {
                 "function": func_name,
