@@ -6,8 +6,10 @@ Tab Navigation + Chart.js + PM2 Health + Feedback + Context Analytics.
 Port: 9093
 """
 import asyncio
+import hashlib
 import json
 import logging
+import secrets
 import time
 import os
 import subprocess
@@ -15,8 +17,10 @@ from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from fastapi.security import APIKeyHeader
+from starlette.status import HTTP_403_FORBIDDEN
 from neo4j import GraphDatabase
 
 from mcp_server.config import config
@@ -24,6 +28,35 @@ from mcp_server.config import config
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="KG Dashboard v5", version="5.0")
+
+# --- API Key Authentication ---
+_API_KEY_FILE = Path(os.path.expanduser("~/.claude/kg-dashboard-api-key"))
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def _load_or_create_api_key() -> str:
+    """Load existing API key or generate a new one."""
+    if _API_KEY_FILE.exists():
+        key = _API_KEY_FILE.read_text().strip()
+        if key:
+            return key
+    key = secrets.token_urlsafe(32)
+    _API_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _API_KEY_FILE.write_text(key)
+    _API_KEY_FILE.chmod(0o600)
+    logger.info(f"Generated new dashboard API key → {_API_KEY_FILE}")
+    return key
+
+
+DASHBOARD_API_KEY: str = os.environ.get("KG_DASHBOARD_API_KEY", "") or _load_or_create_api_key()
+
+
+async def verify_api_key(api_key: str = Depends(_api_key_header), key_param: str = Query(None, alias="api_key")):
+    """Dependency that rejects requests without a valid API key."""
+    token = api_key or key_param
+    if not token or not secrets.compare_digest(token, DASHBOARD_API_KEY):
+        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Invalid or missing API key")
+    return token
 
 # Neo4j connection — use shared Config to avoid parameter divergence
 driver = None
@@ -36,6 +69,12 @@ def get_driver():
             config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password)
         )
     return driver
+
+
+@app.on_event("startup")
+async def _log_api_key_info():
+    logger.info(f"Dashboard API key stored at: {_API_KEY_FILE}")
+    logger.info(f"Pass via header 'X-API-Key' or query param '?api_key=...'")
 
 
 # WebSocket connections
@@ -62,8 +101,11 @@ async def dashboard_page():
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket 연결 관리"""
+async def websocket_endpoint(websocket: WebSocket, api_key: str = Query(None)):
+    """WebSocket 연결 관리 (requires api_key query param)"""
+    if not api_key or not secrets.compare_digest(api_key, DASHBOARD_API_KEY):
+        await websocket.close(code=4003, reason="Invalid or missing API key")
+        return
     await websocket.accept()
     active_connections.append(websocket)
     try:
@@ -85,7 +127,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 @app.get("/api/stats")
-async def api_stats():
+async def api_stats(_: str = Depends(verify_api_key)):
     """REST API: 통계"""
     return await get_dashboard_data()
 
@@ -161,7 +203,7 @@ async def get_dashboard_data() -> Dict[str, Any]:
 
 
 @app.get("/api/search")
-async def api_search(q: str = "", mode: str = "hybrid"):
+async def api_search(q: str = "", mode: str = "hybrid", _: str = Depends(verify_api_key)):
     """검색 테스트 API — Search Playground용"""
     if not q.strip():
         return {"results": [], "strategy": {}}
@@ -188,7 +230,7 @@ async def api_search(q: str = "", mode: str = "hybrid"):
 
 
 @app.get("/api/namespaces")
-async def api_namespaces():
+async def api_namespaces(_: str = Depends(verify_api_key)):
     """프로젝트(Namespace) 목록 + 노드 수"""
     d = get_driver()
     with d.session() as s:
@@ -201,7 +243,7 @@ async def api_namespaces():
 
 
 @app.get("/api/stats/by-namespace")
-async def api_stats_by_namespace(ns: str = ""):
+async def api_stats_by_namespace(ns: str = "", _: str = Depends(verify_api_key)):
     """특정 네임스페이스의 노드/엣지 통계"""
     if not ns:
         return {"error": "namespace required"}
@@ -227,7 +269,7 @@ async def api_stats_by_namespace(ns: str = ""):
 
 
 @app.get("/api/judge-history")
-async def api_judge_history():
+async def api_judge_history(_: str = Depends(verify_api_key)):
     """Judge 평가 이력 (최근 20개)"""
     log_file = os.path.expanduser("~/.claude/kg-judge-log/judge.jsonl")
     entries = []
@@ -245,7 +287,7 @@ async def api_judge_history():
 
 
 @app.get("/api/github-ratio")
-async def api_github_ratio():
+async def api_github_ratio(_: str = Depends(verify_api_key)):
     """GitHub vs Local 노드 비율"""
     d = get_driver()
     with d.session() as s:
@@ -266,7 +308,7 @@ async def api_github_ratio():
 
 
 @app.get("/api/services")
-async def api_services():
+async def api_services(_: str = Depends(verify_api_key)):
     """PM2 서비스 상태"""
     try:
         r = subprocess.run(["pm2", "jlist"], capture_output=True, text=True, timeout=5)
@@ -296,7 +338,7 @@ async def api_services():
 
 
 @app.get("/api/feedback-stats")
-async def api_feedback_stats():
+async def api_feedback_stats(_: str = Depends(verify_api_key)):
     """사용자 피드백 통계"""
     fb_file = os.path.expanduser("~/.claude/kg-user-feedback.jsonl")
     stats = {"total": 0, "good": 0, "bad": 0, "recent": [], "by_intent": {}}
@@ -327,7 +369,7 @@ async def api_feedback_stats():
 
 
 @app.get("/api/context-stats")
-async def api_context_stats():
+async def api_context_stats(_: str = Depends(verify_api_key)):
     """컨텍스트 주입 분석 — trigger 로그 기반"""
     log_file = os.path.expanduser("~/.claude/logs/mcp-kg-trigger.log")
     stats = {"total_triggers": 0, "injected": 0, "quality": {"HIGH": 0, "MEDIUM": 0, "LOW": 0, "NONE": 0}, "intents": {}, "recent": []}
@@ -367,7 +409,7 @@ async def api_context_stats():
 
 
 @app.get("/api/relationships")
-async def api_relationships():
+async def api_relationships(_: str = Depends(verify_api_key)):
     """관계 타입 분포"""
     d = get_driver()
     with d.session() as s:
@@ -380,7 +422,7 @@ async def api_relationships():
 
 
 @app.get("/api/top-accessed")
-async def api_top_accessed():
+async def api_top_accessed(_: str = Depends(verify_api_key)):
     """가장 많이 참조된 노드"""
     d = get_driver()
     with d.session() as s:
@@ -397,7 +439,7 @@ async def api_top_accessed():
 
 
 @app.get("/api/watcher-activity")
-async def api_watcher_activity():
+async def api_watcher_activity(_: str = Depends(verify_api_key)):
     """파일 워처 최근 활동"""
     watched_file = os.path.expanduser("~/.claude/kg-watched-projects.json")
     activity = {"projects": [], "recent_syncs": []}
@@ -428,7 +470,7 @@ async def api_watcher_activity():
 
 
 @app.get("/api/search-quality")
-async def api_search_quality():
+async def api_search_quality(_: str = Depends(verify_api_key)):
     """최근 벤치마크 결과 (타입별 분석 포함)"""
     results_dir = Path(__file__).parent.parent.parent / "tests" / "benchmark" / "results"
     if not results_dir.exists():
@@ -477,7 +519,7 @@ async def api_search_quality():
 
 
 @app.get("/api/graph")
-async def api_graph(ns: str = "", center: str = "", limit: int = 150, mode: str = ""):
+async def api_graph(ns: str = "", center: str = "", limit: int = 150, mode: str = "", _: str = Depends(verify_api_key)):
     """그래프 시각화용 노드+엣지 데이터 (Cytoscape.js 형식)
     mode='all' → 모든 네임스페이스에서 골고루 샘플링
     """
@@ -585,7 +627,7 @@ async def api_graph(ns: str = "", center: str = "", limit: int = 150, mode: str 
 
 
 @app.get("/api/growth")
-async def api_growth():
+async def api_growth(_: str = Depends(verify_api_key)):
     """시스템 성장 타임라인 — 날짜별 노드/활동 증가 추이"""
     d = get_driver()
     result = {}
@@ -638,7 +680,7 @@ async def api_growth():
 
 
 @app.get("/api/data-quality")
-async def api_data_quality():
+async def api_data_quality(_: str = Depends(verify_api_key)):
     """데이터 품질 대시보드 — 네임스페이스별 커버리지"""
     d = get_driver()
     result = {"overall": {}, "by_namespace": []}
@@ -703,7 +745,7 @@ async def api_data_quality():
 
 
 @app.get("/api/pipeline-status")
-async def api_pipeline_status():
+async def api_pipeline_status(_: str = Depends(verify_api_key)):
     """자동 파이프라인 상태 — 진행 중인 프로세스 확인"""
     status = {"stages": [], "running": False}
     try:
@@ -735,7 +777,7 @@ async def api_pipeline_status():
 
 
 @app.get("/api/hook-activity")
-async def api_hook_activity():
+async def api_hook_activity(_: str = Depends(verify_api_key)):
     """Hook 실행 모니터 — 로그 파일 기반 통계"""
     hooks = {
         "auto-trigger": {"log": "~/.claude/logs/mcp-kg-trigger.log", "calls": 0, "errors": 0},
@@ -787,7 +829,7 @@ async def api_hook_activity():
 
 
 @app.get("/api/benchmark-history")
-async def api_benchmark_history():
+async def api_benchmark_history(_: str = Depends(verify_api_key)):
     """벤치마크 히스토리 — 시간순 트렌드"""
     results_dir = Path(__file__).parent.parent.parent / "tests" / "benchmark" / "results"
     if not results_dir.exists():
@@ -813,7 +855,7 @@ async def api_benchmark_history():
 
 
 @app.get("/api/cost-tracker")
-async def api_cost_tracker():
+async def api_cost_tracker(_: str = Depends(verify_api_key)):
     """API 비용 추적 — 이번 달 사용량 추정"""
     costs = {
         "voyage_embedding": {"calls": 0, "cost": 0.0, "unit_price": 0.00012},

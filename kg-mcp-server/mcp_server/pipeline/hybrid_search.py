@@ -374,8 +374,9 @@ class HybridSearchEngine:
             # 캐시 크기 제한 (최대 100 엔트리)
             if len(_guardrail_cache) > 100:
                 oldest = sorted(_guardrail_cache, key=lambda k: _guardrail_cache[k]["ts"])
-                for k in oldest[:50]:
-                    del _guardrail_cache[k]
+                keys_to_remove = oldest[:50]
+                for k in keys_to_remove:
+                    _guardrail_cache.pop(k, None)
 
         if injected:
             return injected + results

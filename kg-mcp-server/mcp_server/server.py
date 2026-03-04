@@ -202,6 +202,41 @@ class KnowledgeGraphServer:
             """사용 가능한 도구 목록 — single source of truth in tools/schemas.py"""
             return get_all_tool_schemas()
 
+        # Tool dispatch table — built once, not per request
+        self._tool_dispatch = {
+            "search_knowledge": self._search_knowledge,
+            "get_function_context": self._get_function_context,
+            "get_module_structure": self._get_module_structure,
+            "get_security_patterns": lambda _: self._get_security_patterns(),
+            "get_graph_stats": lambda _: self._get_graph_stats(),
+            "smart_context": self._smart_context,
+            "hybrid_search": self._hybrid_search,
+            "get_call_graph": self._get_call_graph,
+            "get_similar_code": self._get_similar_code,
+            "get_cache_stats": lambda _: self._get_cache_stats_v2(),
+            "get_analytics_summary": lambda _: self._get_analytics_summary(),
+            "get_top_referenced": self._get_top_referenced,
+            "get_recent_activity": self._get_recent_activity,
+            "get_session_context": self._get_session_context,
+            "evolve_ontology": self._evolve_ontology,
+            "promote_pattern": self._promote_pattern,
+            "get_global_insights": self._get_global_insights,
+            "suggest_tests": self._suggest_tests,
+            "get_bug_hotspots": self._get_bug_hotspots,
+            "provide_feedback": self._provide_feedback,
+            "simulate_impact": self._simulate_impact,
+            "sync_incremental": self._sync_incremental,
+            "evaluate_code": self._evaluate_code,
+            "semantic_search": self._semantic_search,
+            "ask_codebase": self._ask_codebase,
+            "generate_docs": self._generate_docs,
+            "assist_code": self._assist_code,
+            "get_shared_context": self._get_shared_context,
+            "publish_context": self._publish_context,
+            "get_quality_report": lambda _: self._get_quality_report(),
+            "index_project": self._index_project,
+        }
+
         @self.server.call_tool()
         async def handle_call_tool(
             name: str, arguments: dict
@@ -214,42 +249,7 @@ class KnowledgeGraphServer:
             correlation_id = log_mcp_request(name, arguments)
 
             try:
-                # Tool dispatch table — replaces if-elif chain for maintainability
-                _TOOL_DISPATCH = {
-                    "search_knowledge": self._search_knowledge,
-                    "get_function_context": self._get_function_context,
-                    "get_module_structure": self._get_module_structure,
-                    "get_security_patterns": lambda _: self._get_security_patterns(),
-                    "get_graph_stats": lambda _: self._get_graph_stats(),
-                    "smart_context": self._smart_context,
-                    "hybrid_search": self._hybrid_search,
-                    "get_call_graph": self._get_call_graph,
-                    "get_similar_code": self._get_similar_code,
-                    "get_cache_stats": lambda _: self._get_cache_stats_v2(),
-                    "get_analytics_summary": lambda _: self._get_analytics_summary(),
-                    "get_top_referenced": self._get_top_referenced,
-                    "get_recent_activity": self._get_recent_activity,
-                    "get_session_context": self._get_session_context,
-                    "evolve_ontology": self._evolve_ontology,
-                    "promote_pattern": self._promote_pattern,
-                    "get_global_insights": self._get_global_insights,
-                    "suggest_tests": self._suggest_tests,
-                    "get_bug_hotspots": self._get_bug_hotspots,
-                    "provide_feedback": self._provide_feedback,
-                    "simulate_impact": self._simulate_impact,
-                    "sync_incremental": self._sync_incremental,
-                    "evaluate_code": self._evaluate_code,
-                    "semantic_search": self._semantic_search,
-                    "ask_codebase": self._ask_codebase,
-                    "generate_docs": self._generate_docs,
-                    "assist_code": self._assist_code,
-                    "get_shared_context": self._get_shared_context,
-                    "publish_context": self._publish_context,
-                    "get_quality_report": lambda _: self._get_quality_report(),
-                    "index_project": self._index_project,
-                }
-
-                handler = _TOOL_DISPATCH.get(name)
+                handler = self._tool_dispatch.get(name)
                 if handler is None:
                     result = f"Unknown tool: {name}"
                 else:

@@ -384,6 +384,10 @@ class GraphWriteBack:
                     DataDependencyGraphWriter,
                 )
                 if path.suffix == '.py':
+                    file_size = os.path.getsize(file_path)
+                    if file_size > self.MAX_FILE_SIZE:
+                        logger.warning(f"File too large for data dep extraction ({file_size} bytes): {file_path}")
+                        raise ValueError("file too large")
                     extractor = DataDependencyExtractor(file_path)
                     with open(file_path, 'r', encoding='utf-8') as f:
                         source = f.read()
