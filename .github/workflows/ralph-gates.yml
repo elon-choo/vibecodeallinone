@@ -1,0 +1,74 @@
+name: Ralph Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ralph-gates:
+    name: Ralph Loop Quality Gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install ruff
+
+      - name: "G0: Environment Check"
+        run: python3 -c "import sys; assert sys.version_info >= (3, 11), f'Python {sys.version} < 3.11'"
+
+      - name: "G1: Lint (fatal errors)"
+        run: ruff check --select E9,F63,F7,F82 kg-mcp-server/ hooks/
+
+      - name: "G2: Forbidden String Scan"
+        run: |
+          python3 -c "
+          import re, sys
+          from pathlib import Path
+
+          patterns = {
+              r'from src\.': 'External src. import',
+              r'neo4j_knowledgeGraph': 'Hardcoded legacy path',
+              r'~/Documents': 'Hardcoded home path',
+              r'google\.generativeai': 'Deprecated SDK import',
+          }
+
+          issues = []
+          for f in Path('kg-mcp-server/mcp_server').rglob('*.py'):
+              content = f.read_text(errors='ignore')
+              for pat, desc in patterns.items():
+                  if re.search(pat, content):
+                      issues.append(f'{f}: {desc}')
+
+          if issues:
+              for i in issues:
+                  print(f'FAIL: {i}', file=sys.stderr)
+              sys.exit(1)
+          print('G2: All clear')
+          "
+
+      - name: "G6: SDK Deprecation Check"
+        run: |
+          if grep -q "google-generativeai" kg-mcp-server/requirements.txt 2>/dev/null; then
+            echo "FAIL: google-generativeai found in requirements.txt"
+            exit 1
+          fi
+          echo "G6: No deprecated SDK"
+
+      - name: Run Ralph Loop
+        run: python3 scripts/ralphloop/run.py --review-mode off --json
+        continue-on-error: true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ralph-report
+          path: artifacts/

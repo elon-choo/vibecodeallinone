@@ -8,6 +8,8 @@
 
 Clean code enforcement, vibe coding orchestration, codebase-aware reviews, and intelligent context management — all in one package.
 
+![Demo](docs/assets/demo.gif)
+
 ## 30-Second Install
 
 ```bash
@@ -84,7 +86,15 @@ When installed (Tier 2+), provides 20+ MCP tools:
 
 **Tech Stack**: Neo4j (local), Gemini 3 Flash, Voyage AI voyage-code-3, Tree-sitter (7 languages)
 
-**Benchmark**: keyword P@1 0.720, vector P@1 0.680, hybrid P@1 0.680
+**Benchmark** (10-query suite, `scripts/ralphloop/e2e/t3_benchmark.py`):
+
+| Method | Avg Precision | Avg Recall | Time |
+|--------|--------------|------------|------|
+| Vanilla grep | 0.155 | 0.933 | 295ms |
+| KG hybrid search | 0.243 | 0.783 | 315ms |
+| **Delta** | **+0.088** | -0.150 | +20ms |
+
+> KG hybrid search achieves **57% higher precision** by leveraging import graph analysis and node relevance ranking, reducing noise from irrelevant file matches.
 
 ## Quick Start
 

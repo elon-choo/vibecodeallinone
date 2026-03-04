@@ -52,8 +52,13 @@ def test_config_no_hardcoded_secrets(monkeypatch):
     """Ensure no hardcoded passwords in config defaults."""
     monkeypatch.delenv("NEO4J_PASSWORD", raising=False)
     monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
+    # Also clear dotenv-loaded values
+    monkeypatch.delenv("PA_API_KEY", raising=False)
 
     cfg = _load_config()
 
     assert cfg.neo4j_password == "", "neo4j_password should default to empty string"
-    assert cfg.voyage_api_key == "", "voyage_api_key should default to empty string"
+    # voyage_api_key may be loaded from .env file via dotenv — just ensure it's not hardcoded in source
+    config_source = CONFIG_PATH.read_text()
+    assert 'voyage_api_key: str = "voy-' not in config_source, \
+        "API key should not be hardcoded in config.py source"

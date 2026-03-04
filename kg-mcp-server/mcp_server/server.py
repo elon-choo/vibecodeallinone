@@ -680,15 +680,15 @@ class KnowledgeGraphServer:
 
                 elif name == "provide_feedback":
                     result_text = await self._provide_feedback(arguments)
-                    log_search_event(name, arguments, "weight_learner", len(result_text), duration)
+                    log_search_event(name, arguments, "weight_learner", len(result_text), time.perf_counter() - start_time)
 
                 elif name == "simulate_impact":
                     result_text = await self._simulate_impact(arguments)
-                    log_search_event(name, arguments, "impact_simulator", len(result_text), duration)
+                    log_search_event(name, arguments, "impact_simulator", len(result_text), time.perf_counter() - start_time)
 
                 elif name == "sync_incremental":
                     result_text = await self._sync_incremental(arguments)
-                    log_search_event(name, arguments, "write_back", len(result_text), duration)
+                    log_search_event(name, arguments, "write_back", len(result_text), time.perf_counter() - start_time)
 
                 elif name == "evaluate_code":
                     result = await self._evaluate_code(arguments)
