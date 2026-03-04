@@ -155,31 +155,39 @@ class GraphWriteBack:
             return None
         
         result = FileParseResult(file_path=file_path, language="python")
-        
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
-                func = FunctionInfo(
-                    name=node.name,
-                    file_path=file_path,
-                    start_line=node.lineno,
-                    end_line=node.end_lineno or node.lineno,
-                    code=ast.unparse(node),
-                    
-                    docstring=ast.get_docstring(node),
-                    
-                    
-                )
-                
-                # 매우 간단한 호출 추출
-                for child in ast.walk(node):
-                    if isinstance(child, ast.Call):
-                        if isinstance(child.func, ast.Name):
-                            func.calls.append(child.func.id)
-                        elif isinstance(child.func, ast.Attribute):
-                            func.calls.append(child.func.attr)
-                            
-                result.functions.append(func)
-                
+
+        def _extract_calls(node) -> List[str]:
+            """Extract call names from a function body."""
+            calls = []
+            for child in ast.walk(node):
+                if isinstance(child, ast.Call):
+                    if isinstance(child.func, ast.Name):
+                        calls.append(child.func.id)
+                    elif isinstance(child.func, ast.Attribute):
+                        calls.append(child.func.attr)
+            return calls
+
+        def _extract_function(node, parent_class=None):
+            """Extract a FunctionInfo from a FunctionDef/AsyncFunctionDef node."""
+            func = FunctionInfo(
+                name=node.name,
+                file_path=file_path,
+                start_line=node.lineno,
+                end_line=node.end_lineno or node.lineno,
+                code=ast.unparse(node),
+                docstring=ast.get_docstring(node),
+                is_method=parent_class is not None,
+                parent_class=parent_class,
+                calls=_extract_calls(node),
+            )
+            result.functions.append(func)
+
+        # Only iterate top-level nodes (not ast.walk) to avoid extracting
+        # nested/inner functions as top-level entities
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                _extract_function(node)
+
             elif isinstance(node, ast.ClassDef):
                 cls = ClassInfo(
                     name=node.name,
@@ -187,18 +195,18 @@ class GraphWriteBack:
                     start_line=node.lineno,
                     end_line=node.end_lineno or node.lineno,
                     code=ast.unparse(node),
-                    
                     docstring=ast.get_docstring(node),
-                    
                 )
-                
-                # 베이스 클래스
                 for base in node.bases:
                     if isinstance(base, ast.Name):
                         cls.bases.append(base.id)
-                        
                 result.classes.append(cls)
-                
+
+                # Extract methods (direct children of class body only)
+                for child in ast.iter_child_nodes(node):
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        _extract_function(child, parent_class=node.name)
+
         return result
         
     def _upsert_to_neo4j(self, result: FileParseResult, file_path: str, repo_url: str) -> Dict[str, int]:

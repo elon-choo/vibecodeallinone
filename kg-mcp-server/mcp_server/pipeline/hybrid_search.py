@@ -37,10 +37,11 @@ def _escape_lucene(query: str) -> str:
     """Lucene fulltext 쿼리용 특수문자 이스케이프."""
     return _LUCENE_SPECIAL.sub(r'\\\1', query)
 
-# Phase 5.1: Thread-safe 가드레일 캐시 (5분 TTL, max 100 entries)
+# Phase 5.1: Thread-safe 가드레일 캐시 (5분 TTL, max 50 entries)
 _guardrail_cache: Dict[str, Any] = {}
 _guardrail_cache_lock = threading.Lock()
 _GUARDRAIL_CACHE_TTL = 300  # 5 minutes
+_GUARDRAIL_CACHE_MAX = 50  # max entries before eviction
 
 
 class HybridSearchEngine:
@@ -371,12 +372,16 @@ class HybridSearchEngine:
         # 캐시 저장 (thread-safe)
         with _guardrail_cache_lock:
             _guardrail_cache[cache_key] = {"ts": now, "data": injected}
-            # 캐시 크기 제한 (최대 100 엔트리)
-            if len(_guardrail_cache) > 100:
-                oldest = sorted(_guardrail_cache, key=lambda k: _guardrail_cache[k]["ts"])
-                keys_to_remove = oldest[:50]
-                for k in keys_to_remove:
+            # Evict expired entries first, then oldest if still over limit
+            if len(_guardrail_cache) > _GUARDRAIL_CACHE_MAX:
+                expired = [k for k, v in _guardrail_cache.items() if (now - v["ts"]) >= _GUARDRAIL_CACHE_TTL]
+                for k in expired:
                     _guardrail_cache.pop(k, None)
+                # If still over limit, remove oldest entries
+                if len(_guardrail_cache) > _GUARDRAIL_CACHE_MAX:
+                    oldest = sorted(_guardrail_cache, key=lambda k: _guardrail_cache[k]["ts"])
+                    for k in oldest[:len(_guardrail_cache) - _GUARDRAIL_CACHE_MAX // 2]:
+                        _guardrail_cache.pop(k, None)
 
         if injected:
             return injected + results
@@ -580,11 +585,12 @@ class HybridSearchEngine:
         ]
 
         # 6. 핫스팟 경고도 마찬가지로 부록으로 추가
+        core_names = {r.get("name") for r in core_results if r.get("name")}
         hotspot_enriched = self._inject_hotspot_warnings(core_results)
         hotspot_items = [
             item for item in hotspot_enriched
             if item.get("search_mode") not in ("local", "global", "vector", "hybrid", "guardrail")
-            and item not in core_results
+            and item.get("name") not in core_names
         ]
 
         # Phase 8.5: Smart Deduplication — namespace 기반 동명 함수 중복 제거 및 우선순위 조정
