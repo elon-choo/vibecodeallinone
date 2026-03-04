@@ -231,6 +231,37 @@ AI_REVIEW_PERSPECTIVES = [
 ]
 
 
+def _extract_json(text: str) -> dict | None:
+    """Extract JSON object from text that may contain markdown code blocks."""
+    import re
+
+    # Try 1: markdown code block ```json ... ```
+    match = re.search(r'```(?:json)?\s*\n?(\{.*?\})\s*\n?```', text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try 2: raw JSON object
+    start = text.find("{")
+    if start >= 0:
+        # Find matching closing brace
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start:i+1])
+                    except json.JSONDecodeError:
+                        break
+
+    return None
+
+
 def run_ai_reviews(model: str = "sonnet", dry_run: bool = False) -> list:
     """Run Stage 2: AI reviews via independent claude CLI calls."""
     log("Starting Stage 2: AI Multi-Perspective Review", "RUN")
@@ -250,24 +281,21 @@ def run_ai_reviews(model: str = "sonnet", dry_run: bool = False) -> list:
             timeout=180,
         )
 
-        if result.get("status") == "success" and result.get("output_tail"):
-            # Try to extract JSON from output
-            output = result["output_tail"]
-            try:
-                # Find JSON in output
-                start = output.find("{")
-                end = output.rfind("}") + 1
-                if start >= 0 and end > start:
-                    review_data = json.loads(output[start:end])
-                    review_file.write_text(json.dumps(review_data, indent=2))
-                    results.append(review_data)
-                    log(f"[{perspective['name']}] Score: {review_data.get('score', '?')}/10  "
-                        f"Issues: {len(review_data.get('issues', []))}", "OK")
-                    continue
-            except json.JSONDecodeError:
-                pass
+        if result.get("status") == "success" and result.get("output"):
+            # Try to extract JSON from output (may be in markdown code block)
+            output = result["output"]
+            review_data = _extract_json(output)
+
+            if review_data and isinstance(review_data, dict) and "score" in review_data:
+                review_file.write_text(json.dumps(review_data, indent=2))
+                results.append(review_data)
+                log(f"[{perspective['name']}] Score: {review_data.get('score', '?')}/10  "
+                    f"Issues: {len(review_data.get('issues', []))}", "OK")
+                continue
 
             log(f"[{perspective['name']}] Could not parse review JSON", "WARN")
+            # Save raw output for debugging
+            (reviews_dir / f"{perspective['id']}_raw.txt").write_text(output[:5000])
         elif dry_run:
             # Simulate for dry-run
             results.append({"perspective": perspective["id"], "score": 7, "issues": [], "summary": "dry-run"})
@@ -278,29 +306,32 @@ def run_ai_reviews(model: str = "sonnet", dry_run: bool = False) -> list:
 
 
 def calculate_ai_review_score(reviews: list) -> int:
-    """Calculate Stage 2 score (0-30) from AI reviews."""
+    """Calculate Stage 2 score (0-30) from AI reviews.
+
+    Uses average of per-perspective scores (0-10) scaled to 0-30.
+    CRITICAL issues cap the score (can't exceed 20 if any CRITICAL exists).
+    """
     if not reviews:
         return 0
 
     # Average score across perspectives (each 0-10), scaled to 0-30
     total = sum(r.get("score", 0) for r in reviews)
     avg = total / len(reviews)  # 0-10
+    score = round(avg * 3)  # scale 0-10 → 0-30
 
-    # Deduct for CRITICAL/HIGH issues
+    # Count unique CRITICAL issues (deduplicated)
     critical_count = sum(
         1 for r in reviews
         for i in r.get("issues", [])
-        if i.get("severity") in ("CRITICAL",)
-    )
-    high_count = sum(
-        1 for r in reviews
-        for i in r.get("issues", [])
-        if i.get("severity") in ("HIGH",)
+        if i.get("severity") == "CRITICAL"
     )
 
-    score = int(avg * 3)  # scale 0-10 → 0-30
-    score -= critical_count * 8
-    score -= high_count * 3
+    # Cap score if CRITICAL issues exist (but don't zero out)
+    if critical_count > 0:
+        score = min(score, 20)  # cap at 20/30 if any CRITICAL
+    if critical_count > 5:
+        score = min(score, 15)  # further cap if many CRITICALs
+
     return max(0, min(30, score))
 
 
@@ -323,6 +354,7 @@ def call_claude(prompt: str, task_id: str, model: str = "sonnet",
         "--allowedTools", ALLOWED_TOOLS,
         "--append-system-prompt", system,
         "--no-session-persistence",
+        "--output-format", "json",
     ]
 
     # Build clean env: remove CLAUDECODE to avoid nested session block
@@ -347,8 +379,19 @@ def call_claude(prompt: str, task_id: str, model: str = "sonnet",
         elapsed = time.perf_counter() - start
 
         success = result.returncode == 0
-        output = result.stdout.strip()[-2000:] if result.stdout else ""
         error = result.stderr.strip()[-500:] if result.stderr else ""
+
+        # Parse JSON envelope from --output-format json
+        output = ""
+        if result.stdout and result.stdout.strip():
+            try:
+                envelope = json.loads(result.stdout.strip())
+                output = envelope.get("result", "")
+                cost = envelope.get("total_cost_usd", 0)
+                if cost:
+                    log(f"  Cost: ${cost:.4f}", "INFO")
+            except json.JSONDecodeError:
+                output = result.stdout.strip()[-2000:]
 
         log(f"[{task_id}] {'OK' if success else 'FAIL'} ({elapsed:.1f}s)",
             "OK" if success else "FAIL")
@@ -357,7 +400,8 @@ def call_claude(prompt: str, task_id: str, model: str = "sonnet",
             "status": "success" if success else "error",
             "task_id": task_id,
             "elapsed": round(elapsed, 1),
-            "output_tail": output[-500:],
+            "output": output,  # full output for JSON extraction
+            "output_tail": output[-500:],  # for log serialization
             "error_tail": error,
         }
 
@@ -426,6 +470,7 @@ def main():
     history = []
     start_time = time.time()
     ai_review_score = 0
+    ai_review_done = False
 
     print(f"\n{'='*60}", file=sys.stderr)
     print(f"  Ralph Loop Orchestrator v4", file=sys.stderr)
@@ -489,7 +534,7 @@ def main():
                 "score_after": new_score,
                 "delta": delta,
                 "fixes": [r["task_id"] for r in round_results],
-                "results": round_results,
+                "results": [{k: v for k, v in r.items() if k != "output"} for r in round_results],
             })
 
             if delta <= 0 and not args.dry_run:
@@ -497,8 +542,9 @@ def main():
 
         # ── Stage 2: AI Review (run once when gates are clean) ──
         gate_failures = [g for g in scan.get("gates", []) if g["status"] == "FAIL"]
-        if not gate_failures and ai_review_score == 0:
+        if not gate_failures and not ai_review_done:
             log("All gates PASS → Running Stage 2: AI Review", "RUN")
+            ai_review_done = True
             reviews = run_ai_reviews(model=args.model, dry_run=args.dry_run)
             ai_review_score = calculate_ai_review_score(reviews)
             new_score = base_score + ai_review_score
