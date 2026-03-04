@@ -53,6 +53,8 @@ class HybridSearchEngine:
             driver: Neo4j 드라이버
         """
         self.driver = driver
+        self._bug_radar = None
+        self._vector_engine = None
 
     def search(
         self,
@@ -369,19 +371,18 @@ class HybridSearchEngine:
             logger.warning(f"Guardrail fulltext search failed, falling back: {e}")
             injected = self._inject_guardrails_fallback(text_context)
 
-        # 캐시 저장 (thread-safe)
+        # 캐시 저장 (thread-safe, bounded)
         with _guardrail_cache_lock:
-            _guardrail_cache[cache_key] = {"ts": now, "data": injected}
-            # Evict expired entries first, then oldest if still over limit
-            if len(_guardrail_cache) > _GUARDRAIL_CACHE_MAX:
-                expired = [k for k, v in _guardrail_cache.items() if (now - v["ts"]) >= _GUARDRAIL_CACHE_TTL]
-                for k in expired:
+            # Evict expired entries BEFORE inserting to bound growth
+            expired = [k for k, v in _guardrail_cache.items() if (now - v["ts"]) >= _GUARDRAIL_CACHE_TTL]
+            for k in expired:
+                _guardrail_cache.pop(k, None)
+            # If still at/over limit, remove oldest entries to make room
+            if len(_guardrail_cache) >= _GUARDRAIL_CACHE_MAX:
+                oldest = sorted(_guardrail_cache, key=lambda k: _guardrail_cache[k]["ts"])
+                for k in oldest[:len(_guardrail_cache) - _GUARDRAIL_CACHE_MAX // 2 + 1]:
                     _guardrail_cache.pop(k, None)
-                # If still over limit, remove oldest entries
-                if len(_guardrail_cache) > _GUARDRAIL_CACHE_MAX:
-                    oldest = sorted(_guardrail_cache, key=lambda k: _guardrail_cache[k]["ts"])
-                    for k in oldest[:len(_guardrail_cache) - _GUARDRAIL_CACHE_MAX // 2]:
-                        _guardrail_cache.pop(k, None)
+            _guardrail_cache[cache_key] = {"ts": now, "data": injected}
 
         if injected:
             return injected + results
@@ -395,9 +396,10 @@ class HybridSearchEngine:
         if not node_names:
             return results
         try:
-            from mcp_server.pipeline.bug_radar import BugRadar
-            radar = BugRadar(self.driver)
-            warnings = radar.get_hotspot_warnings(node_names)
+            if self._bug_radar is None:
+                from mcp_server.pipeline.bug_radar import BugRadar
+                self._bug_radar = BugRadar(self.driver)
+            warnings = self._bug_radar.get_hotspot_warnings(node_names)
             if warnings:
                 return warnings + results
         except Exception as e:
@@ -439,9 +441,10 @@ class HybridSearchEngine:
         실패 시 빈 리스트 반환 (keyword 검색으로 fallback).
         """
         try:
-            from mcp_server.pipeline.vector_search import VectorSearchEngine
-            engine = VectorSearchEngine(self.driver)
-            result = engine.semantic_search(query, limit=limit, threshold=0.5)
+            if self._vector_engine is None:
+                from mcp_server.pipeline.vector_search import VectorSearchEngine
+                self._vector_engine = VectorSearchEngine(self.driver)
+            result = self._vector_engine.semantic_search(query, limit=limit, threshold=0.5)
             if result.get("success"):
                 items = result.get("results", [])
                 for item in items:

@@ -135,18 +135,25 @@ class GraphWriteBack:
         logger.info(f"tree-sitter parsed {file_path}: {len(result.functions)} funcs, {len(result.classes)} classes")
         return result
 
-    def _parse_python_ast(self, file_path: str):
-        """간단한 Python AST 기반 파서 (tree-sitter 에러 우회용)"""
-        try:
-            file_size = os.path.getsize(file_path)
-            if file_size > self.MAX_FILE_SIZE:
-                logger.warning(f"File too large to parse ({file_size} bytes): {file_path}")
+    def _parse_python_ast(self, file_path: str, source: str = None):
+        """간단한 Python AST 기반 파서 (tree-sitter 에러 우회용)
+
+        Args:
+            file_path: 파일 경로
+            source: 이미 읽은 소스코드 (None이면 파일에서 읽음)
+        """
+        if source is None:
+            try:
+                file_size = os.path.getsize(file_path)
+                if file_size > self.MAX_FILE_SIZE:
+                    logger.warning(f"File too large to parse ({file_size} bytes): {file_path}")
+                    return None
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    source = f.read()
+            except (PermissionError, OSError) as e:
+                logger.warning(f"Cannot read {file_path}: {e}")
                 return None
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                code = f.read()
-        except (PermissionError, OSError) as e:
-            logger.warning(f"Cannot read {file_path}: {e}")
-            return None
+        code = source
 
         try:
             tree = ast.parse(code)
@@ -316,6 +323,17 @@ class GraphWriteBack:
         if not path.is_file():
             return {"success": False, "error": f"File not found: {file_path}"}
             
+        # Read file once upfront to avoid double-read race conditions
+        _cached_source = None
+        if path.suffix == '.py':
+            try:
+                file_size = os.path.getsize(str(path))
+                if file_size <= self.MAX_FILE_SIZE:
+                    with open(str(path), 'r', encoding='utf-8', errors='replace') as f:
+                        _cached_source = f.read()
+            except (PermissionError, OSError) as e:
+                logger.warning(f"Cannot read {file_path}: {e}")
+
         try:
             # Phase 10: tree-sitter 파서 우선 사용 (지원 언어인 경우)
             result = None
@@ -328,7 +346,7 @@ class GraphWriteBack:
             # Fallback: Python AST (non-Python files rely on tree-sitter)
             if result is None:
                 if path.suffix == '.py':
-                    result = self._parse_python_ast(str(path))
+                    result = self._parse_python_ast(str(path), source=_cached_source)
                 else:
                     logger.debug(f"No parser available for {path.suffix} (tree-sitter failed)")
                 
@@ -391,15 +409,9 @@ class GraphWriteBack:
                     DataDependencyExtractor,
                     DataDependencyGraphWriter,
                 )
-                if path.suffix == '.py':
-                    file_size = os.path.getsize(file_path)
-                    if file_size > self.MAX_FILE_SIZE:
-                        logger.warning(f"File too large for data dep extraction ({file_size} bytes): {file_path}")
-                        raise ValueError("file too large")
+                if path.suffix == '.py' and _cached_source is not None:
                     extractor = DataDependencyExtractor(file_path)
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        source = f.read()
-                    deps = extractor.extract(source)
+                    deps = extractor.extract(_cached_source)
                     if deps:
                         writer = DataDependencyGraphWriter(self.driver)
                         writer.cleanup_stale(file_path)
