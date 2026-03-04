@@ -16,3 +16,5 @@ power-pack.env
 *.p12
 *.pfx
 .claude/
+artifacts/
+.ralphloop/
