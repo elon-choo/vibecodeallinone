@@ -323,8 +323,11 @@ def call_claude(prompt: str, task_id: str, model: str = "sonnet",
         "--allowedTools", ALLOWED_TOOLS,
         "--append-system-prompt", system,
         "--no-session-persistence",
-        prompt,
     ]
+
+    # Build clean env: remove CLAUDECODE to avoid nested session block
+    clean_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    clean_env["CLAUDE_CODE_ENTRYPOINT"] = "cli"
 
     if dry_run:
         log(f"[DRY-RUN] Would call: claude -p --model {model} '{prompt[:80]}...'", "WARN")
@@ -336,9 +339,10 @@ def call_claude(prompt: str, task_id: str, model: str = "sonnet",
     try:
         result = subprocess.run(
             cmd,
+            input=prompt,  # pass prompt via stdin to avoid shell escaping issues
             capture_output=True, text=True, timeout=timeout,
             cwd=str(REPO_ROOT),
-            env={**os.environ, "CLAUDE_CODE_ENTRYPOINT": "cli"},
+            env=clean_env,
         )
         elapsed = time.perf_counter() - start
 
