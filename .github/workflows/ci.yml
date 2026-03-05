@@ -120,5 +120,5 @@ jobs:
       - name: Install test dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Run pytest
-        run: pytest tests/ -v
+      - name: Run pytest with coverage
+        run: pytest tests/ -v --cov=kg-mcp-server/mcp_server --cov-report=term-missing --cov-fail-under=2

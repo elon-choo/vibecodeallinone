@@ -214,6 +214,59 @@ def check_release_gates() -> list:
 
 # ── Score Calculator ──────────────────────────────────────
 
+def load_e2e_score() -> int:
+    """Load Stage 3 E2E score from artifacts/e2e_score.json (0-20)."""
+    e2e_file = ARTIFACTS_DIR / "e2e_score.json"
+    if not e2e_file.exists():
+        return 0
+    try:
+        data = json.loads(e2e_file.read_text())
+        return min(20, data.get("total_score", 0))
+    except (json.JSONDecodeError, KeyError):
+        return 0
+
+
+def load_ai_review_score() -> int:
+    """Load Stage 2 AI review score from artifacts/reviews/*.json (0-30)."""
+    reviews_dir = ARTIFACTS_DIR / "reviews"
+    if not reviews_dir.exists():
+        return 0
+
+    scores = []
+    for review_file in sorted(reviews_dir.glob("review_*.json")):
+        if "_raw" in review_file.name:
+            continue
+        try:
+            data = json.loads(review_file.read_text())
+            scores.append(data.get("score", 0))
+        except (json.JSONDecodeError, KeyError):
+            continue
+
+    if not scores:
+        return 0
+
+    avg = sum(scores) / len(scores)
+    ai_score = round(avg * 3)  # 0-10 avg × 3 → 0-30
+
+    # Cap if CRITICAL issues exist
+    total_critical = 0
+    for review_file in reviews_dir.glob("review_*.json"):
+        if "_raw" in review_file.name:
+            continue
+        try:
+            data = json.loads(review_file.read_text())
+            total_critical += sum(1 for i in data.get("issues", []) if i.get("severity") == "CRITICAL")
+        except (json.JSONDecodeError, KeyError):
+            continue
+
+    if total_critical >= 5:
+        ai_score = min(ai_score, 15)
+    elif total_critical > 0:
+        ai_score = min(ai_score, 20)
+
+    return min(30, ai_score)
+
+
 def calculate_score(gates: list, release_checks: list) -> dict:
     """Calculate Health Score (0-100)."""
     # Stage 1: Machine Gates (30 points)
@@ -228,25 +281,31 @@ def calculate_score(gates: list, release_checks: list) -> dict:
             stage1 -= 1
     stage1 = max(0, stage1)
 
-    # Stage 2: AI Review — skipped (0/30 if not run)
-    stage2 = 0
+    # Stage 2: AI Review — load from artifacts/reviews/*.json
+    stage2 = load_ai_review_score()
 
-    # Stage 3: E2E — skipped for now
-    stage3 = 0
+    # Stage 3: E2E — load from artifacts/e2e_score.json
+    stage3 = load_e2e_score()
 
     # Stage 4: Release Gate (20 points, 2 per check)
     stage4 = sum(2 for c in release_checks if c["status"] == "PASS")
     stage4 = min(20, stage4)
 
     total = stage1 + stage2 + stage3 + stage4
+    notes = []
+    if stage2 == 0:
+        notes.append("Stage 2 (AI review) not run")
+    if stage3 == 0:
+        notes.append("Stage 3 (E2E) not run — use: python3 scripts/ralphloop/e2e/t3_benchmark.py --e2e-score")
+
     return {
         "total": total,
         "stage1_gates": stage1,
         "stage2_ai_review": stage2,
         "stage3_e2e": stage3,
         "stage4_release": stage4,
-        "max_possible": stage1 + 30 + 20 + stage4,
-        "max_possible_note": "Stage 2 (AI review) and Stage 3 (E2E) not run — add --review-mode api for full score",
+        "max_possible": 100,
+        "notes": "; ".join(notes) if notes else "All stages active",
     }
 
 
@@ -414,8 +473,10 @@ def main():
     print(f"\n{'='*40}", file=sys.stderr)
     print(f"  Health Score: {score['total']}/100", file=sys.stderr)
     print(f"  Stage 1 (Gates):   {score['stage1_gates']}/30", file=sys.stderr)
-    print(f"  Stage 2 (Review):  {score['stage2_ai_review']}/30 (not run)", file=sys.stderr)
-    print(f"  Stage 3 (E2E):     {score['stage3_e2e']}/20 (not run)", file=sys.stderr)
+    s2_note = "" if score['stage2_ai_review'] > 0 else " (not run)"
+    s3_note = "" if score['stage3_e2e'] > 0 else " (not run)"
+    print(f"  Stage 2 (Review):  {score['stage2_ai_review']}/30{s2_note}", file=sys.stderr)
+    print(f"  Stage 3 (E2E):     {score['stage3_e2e']}/20{s3_note}", file=sys.stderr)
     print(f"  Stage 4 (Release): {score['stage4_release']}/20", file=sys.stderr)
     print(f"  Elapsed: {elapsed:.1f}s", file=sys.stderr)
     print(f"{'='*40}", file=sys.stderr)
