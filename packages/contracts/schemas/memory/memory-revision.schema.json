@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-revision.schema.json",
+  "title": "MemoryRevision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "memory_id",
+    "version",
+    "action",
+    "actor",
+    "created_at"
+  ],
+  "properties": {
+    "memory_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "created",
+        "updated",
+        "archived",
+        "deleted",
+        "restored"
+      ]
+    },
+    "diff": {
+      "type": "object"
+    },
+    "actor": {
+      "type": "string",
+      "enum": [
+        "user",
+        "system",
+        "admin"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

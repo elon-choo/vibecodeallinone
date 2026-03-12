@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f2a24" />
+    <meta
+      name="description"
+      content="Mobile-first assistant shell for auth, Telegram linking, reminder control, continuity, workspace broker consent, auditable jobs, and trust visibility."
+    />
+    <title>Assistant Web Shell</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell-chroma" aria-hidden="true"></div>
+    <main class="shell">
+      <header class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Assistant Web</p>
+          <h1>Resume the conversation before your thumb leaves the glass.</h1>
+          <p class="hero-summary">
+            A mobile-first shell for OpenAI-first sign-in, Telegram companion linking, checkpoint continuity,
+            reminder control, workspace memory broker consent, auditable jobs, and trust visibility. The shell consumes the
+            live `assistant-api` contract and keeps its last snapshot in IndexedDB.
+          </p>
+        </div>
+        <div class="hero-tools">
+          <label class="field">
+            <span>Assistant API base</span>
+            <input id="apiBaseInput" type="url" placeholder="http://127.0.0.1:8000" spellcheck="false" />
+          </label>
+          <div class="hero-actions">
+            <button id="connectButton" class="button button-strong" type="button">Connect OpenAI</button>
+            <button id="refreshButton" class="button" type="button">Refresh Runtime</button>
+          </div>
+          <p id="runtimeMeta" class="microcopy"></p>
+          <div id="notice" class="notice" role="status" aria-live="polite"></div>
+        </div>
+      </header>
+
+      <section class="dashboard">
+        <article class="panel panel-session">
+          <div class="panel-head">
+            <p class="eyebrow">Session Ledger</p>
+            <h2>Auth and device context</h2>
+          </div>
+          <div id="sessionCard" class="session-card"></div>
+        </article>
+
+        <article class="panel panel-telegram">
+          <div class="panel-head">
+            <p class="eyebrow">Companion Surface</p>
+            <h2>Telegram link state</h2>
+          </div>
+          <div id="telegramCard" class="telegram-card"></div>
+        </article>
+
+        <article class="panel panel-reminders">
+          <div class="panel-head">
+            <p class="eyebrow">Reminder Runtime</p>
+            <h2>Telegram reminders</h2>
+          </div>
+          <form id="reminderForm" class="stack reminder-form">
+            <div class="split-fields">
+              <label class="field">
+                <span>Send at</span>
+                <input id="reminderAtInput" name="scheduled_for" type="datetime-local" />
+              </label>
+              <label class="field">
+                <span>Delivery channel</span>
+                <input id="reminderChannelInput" type="text" value="Telegram" readonly />
+              </label>
+            </div>
+            <label class="field">
+              <span>Reminder message</span>
+              <textarea
+                id="reminderMessageInput"
+                name="message"
+                rows="3"
+                placeholder="Example: Review the last Telegram handoff before standup."
+              ></textarea>
+            </label>
+            <div class="reminder-follow-up">
+              <div class="split-fields">
+                <label class="field">
+                  <span>Failure follow-up</span>
+                  <select id="reminderFollowUpActionInput" name="follow_up_action">
+                    <option value="none">No automatic follow-up</option>
+                    <option value="retry">Retry Telegram delivery</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Max attempts</span>
+                  <input id="reminderMaxAttemptsInput" name="max_attempts" type="number" min="2" max="10" value="2" />
+                </label>
+              </div>
+              <label class="field">
+                <span>Retry delay (seconds)</span>
+                <input
+                  id="reminderRetryDelayInput"
+                  name="retry_delay_seconds"
+                  type="number"
+                  min="0"
+                  max="604800"
+                  value="300"
+                />
+              </label>
+              <p id="reminderFollowUpMeta" class="microcopy"></p>
+            </div>
+            <div class="cluster">
+              <button id="saveReminderButton" class="button button-strong" type="submit">Schedule Reminder</button>
+              <span id="remindersMeta" class="microcopy"></span>
+            </div>
+          </form>
+          <div id="remindersCard" class="reminders-card" aria-live="polite"></div>
+        </article>
+
+        <article class="panel panel-checkpoint">
+          <div class="panel-head">
+            <p class="eyebrow">Resume Capsule</p>
+            <h2>Checkpoint draft</h2>
+          </div>
+          <div id="checkpointConflict" class="checkpoint-conflict" hidden></div>
+          <form id="checkpointForm" class="stack">
+            <label class="field">
+              <span>Conversation ID</span>
+              <input id="conversationIdInput" name="conversation_id" type="text" placeholder="conv_01" />
+            </label>
+            <label class="field">
+              <span>Last message ID</span>
+              <input id="lastMessageIdInput" name="last_message_id" type="text" placeholder="msg_09" />
+            </label>
+            <label class="field">
+              <span>Route</span>
+              <input id="routeInput" name="route" type="text" placeholder="/chat/conv_01" />
+            </label>
+            <label class="field">
+              <span>Draft text</span>
+              <textarea id="draftInput" name="draft_text" rows="7" placeholder="Write what should survive device switches."></textarea>
+            </label>
+            <div class="cluster">
+              <button id="saveCheckpointButton" class="button button-strong" type="submit">Save Checkpoint</button>
+              <span id="checkpointMeta" class="microcopy"></span>
+            </div>
+          </form>
+          <div id="checkpointContinuity" class="checkpoint-summary continuity-card" aria-live="polite"></div>
+        </article>
+
+        <article class="panel panel-memory">
+          <div class="panel-head">
+            <p class="eyebrow">Memory Atelier</p>
+            <h2>Explicit memory controls</h2>
+          </div>
+          <form id="memoryForm" class="stack memory-form">
+            <div class="split-fields">
+              <label class="field">
+                <span>Kind</span>
+                <select id="memoryKindInput" name="kind">
+                  <option value="preference">Preference</option>
+                  <option value="profile">Profile</option>
+                  <option value="fact">Fact</option>
+                  <option value="instruction">Instruction</option>
+                  <option value="task">Task</option>
+                  <option value="summary">Summary</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Importance</span>
+                <input id="memoryImportanceInput" name="importance" type="number" min="0" max="100" value="70" />
+              </label>
+            </div>
+            <label class="field">
+              <span>Memory content</span>
+              <textarea
+                id="memoryContentInput"
+                name="content"
+                rows="4"
+                placeholder="Example: Prefers short direct answers and wants Seoul-friendly scheduling."
+              ></textarea>
+            </label>
+            <label class="field">
+              <span>Provenance note</span>
+              <input
+                id="memorySourceNoteInput"
+                name="source_note"
+                type="text"
+                placeholder="Optional note: imported from onboarding call, saved after route change..."
+              />
+            </label>
+            <div class="cluster">
+              <button id="saveMemoryButton" class="button button-strong" type="submit">Save Memory</button>
+              <button id="exportMemoryButton" class="button" type="button">Export Memory</button>
+              <span id="memoryExportMeta" class="microcopy">Selected items below become part of the next checkpoint.</span>
+            </div>
+          </form>
+          <div id="memoryList" class="memory-list" aria-live="polite"></div>
+        </article>
+
+        <article class="panel panel-broker">
+          <div class="panel-head">
+            <p class="eyebrow">Workspace Broker</p>
+            <h2>KG memory broker control</h2>
+          </div>
+          <form id="memoryBrokerForm" class="stack broker-form">
+            <div class="split-fields">
+              <label class="field">
+                <span>Workspace ID</span>
+                <input
+                  id="brokerWorkspaceIdInput"
+                  name="workspace_id"
+                  type="text"
+                  placeholder="workspace_release_ops"
+                  spellcheck="false"
+                />
+              </label>
+              <label class="field">
+                <span>Project scope IDs</span>
+                <input
+                  id="brokerProjectIdsInput"
+                  name="project_ids"
+                  type="text"
+                  placeholder="project_release, project_ops"
+                  spellcheck="false"
+                />
+              </label>
+            </div>
+            <label class="memory-checkbox broker-consent-toggle">
+              <input id="brokerEnabledInput" name="enabled" type="checkbox" />
+              Enable workspace-scoped broker reads from the web control plane
+            </label>
+            <div class="cluster">
+              <button id="saveBrokerButton" class="button button-strong" type="submit">Save Broker Scope</button>
+              <span id="brokerMeta" class="microcopy"></span>
+            </div>
+            <div class="broker-divider" aria-hidden="true"></div>
+            <div class="split-fields">
+              <label class="field">
+                <span>Broker probe</span>
+                <input id="brokerQueryInput" name="query" type="text" placeholder="release evidence" />
+              </label>
+              <label class="field">
+                <span>Project filter</span>
+                <input
+                  id="brokerQueryProjectIdInput"
+                  name="query_project_id"
+                  type="text"
+                  placeholder="Optional project ID"
+                  spellcheck="false"
+                />
+              </label>
+            </div>
+            <div class="cluster">
+              <button id="probeBrokerButton" class="button" type="button">Probe Broker</button>
+              <span id="brokerProbeMeta" class="microcopy"></span>
+            </div>
+          </form>
+          <div id="brokerCard" class="broker-card" aria-live="polite"></div>
+        </article>
+
+        <article class="panel panel-trust">
+          <div class="panel-head">
+            <p class="eyebrow">Trust Surface</p>
+            <h2>Evidence summary only</h2>
+          </div>
+          <div id="trustCard" class="trust-card"></div>
+        </article>
+
+        <article class="panel panel-jobs">
+          <div class="panel-head">
+            <p class="eyebrow">Runtime Ledger</p>
+            <h2>Auditable jobs</h2>
+          </div>
+          <div id="jobsCard" class="jobs-card" aria-live="polite"></div>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-delete-receipt.schema.json",
+  "title": "MemoryDeleteReceipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "delete_id",
+    "job_id",
+    "memory_id",
+    "status",
+    "purge_status",
+    "requested_at",
+    "purge_after"
+  ],
+  "properties": {
+    "delete_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "job_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "memory_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "deleted"
+      ]
+    },
+    "purge_status": {
+      "type": "string",
+      "enum": [
+        "pending_purge"
+      ]
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "purge_after": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

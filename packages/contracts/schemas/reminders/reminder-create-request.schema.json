@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/reminders/reminder-create-request.schema.json",
+  "title": "ReminderCreateRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scheduled_for",
+    "message",
+    "channel"
+  ],
+  "properties": {
+    "scheduled_for": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "channel": {
+      "type": "string",
+      "const": "telegram"
+    },
+    "follow_up_policy": {
+      "$ref": "./reminder-follow-up-policy.schema.json"
+    }
+  }
+}

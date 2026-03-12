@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-broker-consent.schema.json",
+  "title": "MemoryBrokerConsent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "opt_in_required",
+    "enabled"
+  ],
+  "properties": {
+    "opt_in_required": {
+      "type": "boolean",
+      "const": true,
+      "default": true
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "source_surface": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "web",
+        "pwa",
+        "ios_webview",
+        "android_webview",
+        "telegram",
+        null
+      ]
+    },
+    "granted_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "revoked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

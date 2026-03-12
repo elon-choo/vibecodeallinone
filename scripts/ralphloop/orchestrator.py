@@ -17,14 +17,24 @@ Options:
 """
 
 import argparse
+import importlib
 import json
 import os
 import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+RALPH_LOOP_DIR = Path(__file__).parent
+if str(RALPH_LOOP_DIR) not in sys.path:
+    sys.path.insert(0, str(RALPH_LOOP_DIR))
+
+artifact_io = importlib.import_module("artifact_io")
+atomic_write_json = artifact_io.atomic_write_json
+atomic_write_text = artifact_io.atomic_write_text
+review_score_value = artifact_io.review_score_value
 
 # ── Constants ──────────────────────────────────────────────
 REPO_ROOT = Path(__file__).parent.parent.parent
@@ -286,16 +296,22 @@ def run_ai_reviews(model: str = "sonnet", dry_run: bool = False) -> list:
             output = result["output"]
             review_data = _extract_json(output)
 
-            if review_data and isinstance(review_data, dict) and "score" in review_data:
-                review_file.write_text(json.dumps(review_data, indent=2))
+            if review_data and isinstance(review_data, dict):
+                score_value = review_score_value(review_data)
+                if score_value == 0 and "score" not in review_data and "computed_score" not in review_data:
+                    log(f"[{perspective['name']}] Could not parse review JSON", "WARN")
+                    atomic_write_text(reviews_dir / f"{perspective['id']}_raw.txt", output[:5000])
+                    continue
+
+                atomic_write_json(review_file, review_data)
                 results.append(review_data)
-                log(f"[{perspective['name']}] Score: {review_data.get('score', '?')}/10  "
+                log(f"[{perspective['name']}] Score: {score_value}/10  "
                     f"Issues: {len(review_data.get('issues', []))}", "OK")
                 continue
 
             log(f"[{perspective['name']}] Could not parse review JSON", "WARN")
             # Save raw output for debugging
-            (reviews_dir / f"{perspective['id']}_raw.txt").write_text(output[:5000])
+            atomic_write_text(reviews_dir / f"{perspective['id']}_raw.txt", output[:5000])
         elif dry_run:
             # Simulate for dry-run
             results.append({"perspective": perspective["id"], "score": 7, "issues": [], "summary": "dry-run"})
@@ -654,14 +670,14 @@ def main():
 
     # Save log
     log_data = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "final_score": final_score,
         "target_score": args.stop_score,
         "rounds": history,
         "elapsed_seconds": round(elapsed, 1),
         "model": args.model,
     }
-    ORCHESTRATOR_LOG.write_text(json.dumps(log_data, indent=2, ensure_ascii=False))
+    atomic_write_json(ORCHESTRATOR_LOG, log_data)
     log(f"Log saved: {ORCHESTRATOR_LOG}", "OK")
 
     # Exit code

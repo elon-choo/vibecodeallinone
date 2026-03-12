@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/checkpoint/checkpoint-upsert-request.schema.json",
+  "title": "CheckpointUpsertRequest",
+  "allOf": [
+    {
+      "$ref": "./session-checkpoint.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "base_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "force": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  ]
+}

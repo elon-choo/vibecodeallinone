@@ -19,13 +19,19 @@ Output: JSON with per-query results, aggregate metrics, and E2E score.
 """
 
 import argparse
-import json
-import os
+import importlib
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+RALPH_LOOP_DIR = Path(__file__).parent.parent
+if str(RALPH_LOOP_DIR) not in sys.path:
+    sys.path.insert(0, str(RALPH_LOOP_DIR))
+
+artifact_io = importlib.import_module("artifact_io")
+atomic_write_json = artifact_io.atomic_write_json
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 ARTIFACTS_DIR = REPO_ROOT / "artifacts"
@@ -385,7 +391,7 @@ def main():
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False))
+    atomic_write_json(output_path, results)
 
     # Print summary
     s = results["summary"]
@@ -415,7 +421,7 @@ def main():
 
         # Save E2E score
         E2E_SCORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        E2E_SCORE_FILE.write_text(json.dumps(e2e, indent=2, ensure_ascii=False))
+        atomic_write_json(E2E_SCORE_FILE, e2e)
         print(f"  E2E score saved: {E2E_SCORE_FILE}", file=sys.stderr)
 
 

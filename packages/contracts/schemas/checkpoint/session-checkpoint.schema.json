@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/checkpoint/session-checkpoint.schema.json",
+  "title": "SessionCheckpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "user_id",
+    "device_session_id",
+    "conversation_id",
+    "draft_text",
+    "selected_memory_ids",
+    "route",
+    "updated_at",
+    "version"
+  ],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "device_session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "conversation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "last_message_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "draft_text": {
+      "type": "string"
+    },
+    "selected_memory_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "route": {
+      "type": "string",
+      "minLength": 1
+    },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "web",
+        "pwa",
+        "ios_webview",
+        "android_webview",
+        "telegram"
+      ],
+      "default": "web"
+    },
+    "handoff_kind": {
+      "type": "string",
+      "enum": [
+        "none",
+        "resume_link",
+        "quick_capture",
+        "reminder",
+        "approval"
+      ],
+      "default": "none"
+    },
+    "resume_token_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_surface_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

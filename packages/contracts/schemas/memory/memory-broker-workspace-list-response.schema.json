@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-broker-workspace-list-response.schema.json",
+  "title": "MemoryBrokerWorkspaceListResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "items"
+  ],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "./memory-broker-workspace-state.schema.json"
+      },
+      "default": []
+    }
+  }
+}

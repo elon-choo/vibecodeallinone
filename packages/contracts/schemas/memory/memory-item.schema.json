@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-item.schema.json",
+  "title": "MemoryItem",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "user_id",
+    "kind",
+    "content",
+    "status",
+    "importance",
+    "source_type",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "user_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "profile",
+        "preference",
+        "fact",
+        "instruction",
+        "task",
+        "summary",
+        "other"
+      ]
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "active",
+        "archived",
+        "deleted"
+      ]
+    },
+    "importance": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "conversation",
+        "manual_input",
+        "import",
+        "system_capture"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_used_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

@@ -11,13 +11,21 @@ Usage:
 """
 
 import argparse
+import importlib
 import json
 import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+RALPH_LOOP_DIR = Path(__file__).parent
+if str(RALPH_LOOP_DIR) not in sys.path:
+    sys.path.insert(0, str(RALPH_LOOP_DIR))
+
+artifact_io = importlib.import_module("artifact_io")
+review_score_value = artifact_io.review_score_value
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 ARTIFACTS_DIR = REPO_ROOT / "artifacts"
@@ -124,8 +132,9 @@ def load_ai_review_scores() -> dict:
         try:
             data = json.loads(review_file.read_text())
             name = data.get("perspective", review_file.stem.replace("review_", ""))
+            normalized_score = review_score_value(data)
             perspectives[name] = {
-                "score": data.get("score", 0),
+                "score": normalized_score,
                 "issues": data.get("issues", []),
                 "critical_count": sum(1 for i in data.get("issues", []) if i.get("severity") == "CRITICAL"),
                 "high_count": sum(1 for i in data.get("issues", []) if i.get("severity") == "HIGH"),
@@ -329,7 +338,7 @@ def main():
 
     # Step 4: Output
     output = {
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "total_score": total,
         "breakdown": {
             "gates": gate_data["score"],

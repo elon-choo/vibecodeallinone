@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-export-response.schema.json",
+  "title": "MemoryExportResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "export_id",
+    "job_id",
+    "status",
+    "format",
+    "requested_at",
+    "expires_at",
+    "suggested_filename",
+    "item_count",
+    "items"
+  ],
+  "properties": {
+    "export_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "job_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready"
+      ]
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "json"
+      ]
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "suggested_filename": {
+      "type": "string",
+      "minLength": 1
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item",
+          "revisions"
+        ],
+        "properties": {
+          "item": {
+            "$ref": "./memory-record.schema.json"
+          },
+          "revisions": {
+            "type": "array",
+            "items": {
+              "$ref": "./memory-revision.schema.json"
+            },
+            "default": []
+          }
+        }
+      },
+      "default": []
+    }
+  }
+}

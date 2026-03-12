@@ -13,10 +13,23 @@ Usage:
 """
 
 import argparse
+import importlib
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+RALPH_LOOP_DIR = Path(__file__).parent
+if str(RALPH_LOOP_DIR) not in sys.path:
+    sys.path.insert(0, str(RALPH_LOOP_DIR))
+
+artifact_io = importlib.import_module("artifact_io")
+SCHEMA_VERSION = artifact_io.SCHEMA_VERSION
+atomic_write_json = artifact_io.atomic_write_json
+git_commit = artifact_io.git_commit
+git_tree_state = artifact_io.git_tree_state
+hash_inputs = artifact_io.hash_inputs
+hash_json_payload = artifact_io.hash_json_payload
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 ARTIFACTS_DIR = REPO_ROOT / "artifacts"
@@ -339,15 +352,46 @@ def generate_review_template(perspective_id: str) -> dict:
             "3. Set status to PASS, FAIL, or PARTIAL\n"
             "4. Write specific findings (file:line references)\n"
             "5. List files you examined in files_checked\n"
-            "6. Calculate overall score (0-10) based on results"
+            "6. Do not add a top-level score field; save_review computes computed_score from checklist status"
         ),
     }
+
+
+def compute_checklist_score(checklist: list[dict]) -> int:
+    """Compute the canonical 0-10 review score from checklist states."""
+    total_items = len(checklist)
+    if total_items == 0:
+        return 0
+
+    passed = sum(1 for item in checklist if item.get("status") == "PASS")
+    partial = sum(1 for item in checklist if item.get("status") == "PARTIAL")
+    return round((passed + partial * 0.5) / total_items * 10)
+
+
+def determine_review_status(checklist: list[dict], issues: list[dict], blockers: list[str]) -> str:
+    """Translate checklist results into the S03 stage status enum."""
+    if blockers:
+        return "invalid"
+
+    if any(issue.get("severity") == "CRITICAL" for issue in issues):
+        return "fail"
+
+    if any(item.get("status") == "FAIL" for item in checklist):
+        return "warn"
+
+    if any(item.get("status") == "PARTIAL" for item in checklist):
+        return "warn"
+
+    return "pass"
 
 
 def save_review(perspective_id: str, review_data: dict):
     """Save completed review to artifacts/reviews/."""
     REVIEWS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = REVIEWS_DIR / f"review_{perspective_id}.json"
+    reviewed_at = datetime.now(UTC)
+    reviewed_at_iso = reviewed_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+    artifact_suffix = reviewed_at.strftime("%Y%m%dT%H%M%SZ")
 
     # Convert to standard format compatible with orchestrator
     issues = []
@@ -359,30 +403,46 @@ def save_review(perspective_id: str, review_data: dict):
                 "description": item.get("finding", item["check"]),
             })
 
-    # Calculate score from checklist
-    total_items = len(review_data.get("checklist", []))
-    if total_items == 0:
-        score = 0
-    else:
-        passed = sum(1 for i in review_data.get("checklist", []) if i.get("status") == "PASS")
-        partial = sum(1 for i in review_data.get("checklist", []) if i.get("status") == "PARTIAL")
-        score = round((passed + partial * 0.5) / total_items * 10)
+    checklist = review_data.get("checklist", [])
+    computed_score = compute_checklist_score(checklist)
+    blockers = []
+    manual_score_input = review_data.get("score")
+    if manual_score_input is not None:
+        blockers.append("manual_score_override_ignored")
 
-    # Override with explicit score if provided
-    if "score" in review_data:
-        score = review_data["score"]
-
-    output = {
+    output_body = {
+        "schema_version": SCHEMA_VERSION,
+        "artifact_kind": "quality_review_perspective",
+        "artifact_id": f"review_{perspective_id}_{artifact_suffix}",
+        "run_id": f"review_{artifact_suffix}",
+        "stage_id": "quality_review",
         "perspective": perspective_id,
-        "score": score,
+        "status": determine_review_status(checklist, issues, blockers),
+        "computed_score": computed_score,
+        "max_score": 10,
+        "judge_mode": "self_checklist",
         "issues": issues,
         "summary": review_data.get("summary", ""),
-        "checklist_detail": review_data.get("checklist", []),
-        "reviewed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "narrative": review_data.get("summary", ""),
+        "checklist_detail": checklist,
+        "reviewed_at": reviewed_at_iso,
         "reviewer": "claude-code-self-review",
+        "manual_score_input": manual_score_input,
+        "warnings": [],
+        "blockers": blockers,
+        "git_commit": git_commit(REPO_ROOT),
+        "git_tree_state": git_tree_state(REPO_ROOT),
+        "inputs_hash": hash_inputs(
+            {
+                "perspective": perspective_id,
+                "checklist": checklist,
+                "summary": review_data.get("summary", ""),
+            }
+        ),
     }
+    output = {**output_body, "content_hash": hash_json_payload(output_body)}
 
-    output_path.write_text(json.dumps(output, indent=2, ensure_ascii=False))
+    atomic_write_json(output_path, output)
     print(f"  Review saved: {output_path}", file=sys.stderr)
     return output
 

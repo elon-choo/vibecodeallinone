@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/auth/openai-start-request.schema.json",
+  "title": "OpenAiStartRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "redirect_uri",
+    "device_label",
+    "platform"
+  ],
+  "properties": {
+    "redirect_uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "device_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "web",
+        "pwa",
+        "ios_webview",
+        "android_webview"
+      ]
+    }
+  }
+}

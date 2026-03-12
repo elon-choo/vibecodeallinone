@@ -4,13 +4,76 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-12 AI skills + Knowledge Graph MCP server for [Claude Code](https://claude.com/claude-code).
+12 AI skills + Knowledge Graph MCP server for [Claude Code](https://claude.com/claude-code), plus a self-host reference stack for the assistant runtime.
 
 Clean code enforcement, vibe coding orchestration, codebase-aware reviews, and intelligent context management — all in one package.
 
 ![Demo](docs/assets/demo.gif)
 
-## 30-Second Install
+## Choose Your Path
+
+| Path | What You Get | Status | Entry |
+|------|--------------|--------|-------|
+| **Assistant Runtime** | Self-host reference stack for `assistant-web` + `assistant-api` + worker + Telegram control | Available now | `bash scripts/assistant/bootstrap_runtime.sh --target "$HOME/.claude-power-pack-assistant"` |
+| **Power Pack Developer Toolkit** | 12 AI skills + optional KG MCP + hooks | Available now | `bash scripts/install.sh 1` |
+
+Managed quickstart is still the long-term default user path. This repo now ships the operator bootstrap artifact path, but it does not provision the hosted rollout itself.
+The buildable product path in this repo remains the self-host reference stack, and the managed quickstart contract/bootstrap path lives in [ops/managed/README.md](ops/managed/README.md).
+
+## Assistant Runtime Reference Stack
+
+This track is for the assistant product surface, not the Claude Code skill pack. The bootstrap entrypoint creates a local runtime workspace, wires it to the existing `assistant-api` and `assistant-web`, and generates a one-command stack controller for API, web, worker, and Telegram polling.
+
+```bash
+git clone https://github.com/elon-choo/vibecodeallinone.git
+cd vibecodeallinone
+bash scripts/assistant/bootstrap_runtime.sh --target "$HOME/.claude-power-pack-assistant"
+"$HOME/.claude-power-pack-assistant/run-assistant-runtime.sh" start
+"$HOME/.claude-power-pack-assistant/run-assistant-runtime.sh" status
+```
+
+Bootstrap output:
+
+- `assistant-runtime.env` with local mock-mode defaults
+- `run-assistant-api.sh` for the FastAPI runtime
+- `run-assistant-web.sh` for the static PWA shell
+- `run-assistant-worker.sh` for background runtime jobs
+- `run-assistant-telegram.sh` for polling-first Telegram transport
+- `run-assistant-runtime.sh` for `start|stop|restart|status|logs`
+- local `data/`, `artifacts/`, `logs/`, and `run/` directories
+
+Runtime notes:
+
+- `run-assistant-runtime.sh start` launches `assistant-api`, `assistant-web`, and the worker together; Telegram starts in the same operator flow when enabled
+- `run-assistant-runtime.sh stop` tears down the whole stack, and `status` reports per-component state plus log paths
+- defaults to `ASSISTANT_API_PROVIDER_MODE=mock` so the current bootstrap can run without external OIDC credentials
+- locks `ASSISTANT_RUNTIME_OPERATOR_MODE=self-host`; managed quickstart is a separate env contract on the same controller, not a second stack
+- defaults to `ASSISTANT_RUNTIME_TELEGRAM_MODE=auto`, which skips Telegram polling until `ASSISTANT_API_TELEGRAM_BOT_TOKEN` is configured
+- to force Telegram on in the same stack controller, set `ASSISTANT_RUNTIME_TELEGRAM_MODE=enabled` and provide `ASSISTANT_API_TELEGRAM_BOT_TOKEN` plus optional `ASSISTANT_API_TELEGRAM_BOT_USERNAME`
+- does not provision managed hosting or broad cloud infrastructure
+- future managed quickstart operators should start from `scripts/assistant/bootstrap_managed_quickstart.sh` and [ops/managed/RUNBOOK.md](ops/managed/RUNBOOK.md) while reusing `assistant-api`, `assistant-web`, worker, and Telegram transport
+- expects Python 3 plus runtime packages such as `fastapi`, `uvicorn`, and `pydantic` to be available in your environment
+- deeper runtime details live in [services/assistant-api/README.md](services/assistant-api/README.md) and [apps/assistant-web/README.md](apps/assistant-web/README.md)
+
+## Managed Quickstart Operator Bootstrap
+
+This repo still does not provision hosted infrastructure, but it now ships the operator workspace generator for the later managed quickstart path.
+
+```bash
+bash scripts/assistant/bootstrap_managed_quickstart.sh --target "$HOME/.claude-power-pack-managed"
+"$HOME/.claude-power-pack-managed/run-assistant-runtime.sh" status
+```
+
+Managed operator notes:
+
+- it generates the same `run-assistant-runtime.sh start|stop|restart|status|logs` controller used by self-host
+- the generated `assistant-runtime.env` starts in `managed-blocked` until placeholder OIDC/public-origin values are replaced
+- `status` is the intended preflight before any live operator validation work
+- the runbook lives in [ops/managed/RUNBOOK.md](ops/managed/RUNBOOK.md)
+
+## Power Pack Developer Toolkit Install
+
+Use this path when you want the Claude Code skills, Knowledge Graph MCP server, and optional hooks.
 
 ```bash
 git clone https://github.com/elon-choo/vibecodeallinone.git
@@ -18,7 +81,7 @@ cd vibecodeallinone
 bash scripts/install.sh
 ```
 
-## Installation Tiers
+## Developer Toolkit Installation Tiers
 
 | Tier | What You Get | Requirements | Cost |
 |------|-------------|-------------|------|

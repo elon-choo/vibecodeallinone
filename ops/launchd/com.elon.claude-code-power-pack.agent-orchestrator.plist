@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.elon.claude-code-power-pack.agent-orchestrator</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/elon/Documents/elon_opensource/claude-code-power-pack/scripts/orchestration/ensure_agent_orchestrator.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>AGENT_ORCHESTRATOR_MAX_SESSIONS</key>
+    <string>10</string>
+    <key>PATH</key>
+    <string>/Users/elon/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/elon/Documents/elon_opensource/claude-code-power-pack</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StartInterval</key>
+  <integer>180</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/elon/Documents/elon_opensource/claude-code-power-pack/.agent-orchestrator/runtime/launchd.stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/elon/Documents/elon_opensource/claude-code-power-pack/.agent-orchestrator/runtime/launchd.stderr.log</string>
+</dict>
+</plist>

@@ -1,0 +1,17 @@
+{
+  "name": "Assistant Web Shell",
+  "short_name": "Assistant",
+  "description": "Mobile-first shell for assistant-api auth, memory, checkpoint, and trust flows.",
+  "display": "standalone",
+  "background_color": "#f2ebdd",
+  "theme_color": "#0f2a24",
+  "start_url": "./index.html",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

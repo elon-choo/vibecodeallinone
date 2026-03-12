@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-record.schema.json",
+  "title": "MemoryRecord",
+  "allOf": [
+    {
+      "$ref": "./memory-item.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "./memory-source.schema.json"
+          },
+          "default": []
+        }
+      }
+    }
+  ]
+}

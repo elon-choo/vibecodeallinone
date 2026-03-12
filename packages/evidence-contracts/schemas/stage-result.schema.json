@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/evidence/stage-result.schema.json",
+  "title": "StageResult",
+  "allOf": [
+    {
+      "$ref": "artifact-metadata.schema.json"
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage_id",
+        "computed_score",
+        "max_score",
+        "judge_mode",
+        "narrative",
+        "started_at",
+        "completed_at",
+        "warnings",
+        "blockers",
+        "artifact_refs"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "stage_result"
+        },
+        "stage_id": {
+          "type": "string",
+          "enum": [
+            "machine_gates",
+            "quality_review",
+            "e2e_validation",
+            "release_readiness"
+          ]
+        },
+        "computed_score": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_score": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "judge_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "narrative": {
+          "type": "string"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

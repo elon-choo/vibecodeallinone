@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/auth/auth-session.schema.json",
+  "title": "AuthSession",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "user_id",
+    "device_session_id",
+    "auth_state",
+    "provider",
+    "session",
+    "memory_controls"
+  ],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "device_session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "auth_state": {
+      "type": "string",
+      "enum": [
+        "pending_consent",
+        "active",
+        "reauth_required"
+      ]
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "provider_subject",
+        "scopes",
+        "connected_at"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "const": "openai"
+        },
+        "provider_subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "connected_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "expires_at",
+        "last_seen_at"
+      ],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_seen_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "memory_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_export_supported",
+        "memory_delete_supported"
+      ],
+      "properties": {
+        "memory_export_supported": {
+          "type": "boolean"
+        },
+        "memory_delete_supported": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

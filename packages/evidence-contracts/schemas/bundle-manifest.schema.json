@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/evidence/bundle-manifest.schema.json",
+  "title": "BundleManifest",
+  "allOf": [
+    {
+      "$ref": "artifact-metadata.schema.json"
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app_version",
+        "release_channel",
+        "overall_status",
+        "stage_order",
+        "stage_artifacts",
+        "summary_artifact"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "bundle_manifest"
+        },
+        "app_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_channel": {
+          "type": "string",
+          "enum": [
+            "local",
+            "internal",
+            "beta",
+            "public"
+          ]
+        },
+        "overall_status": {
+          "type": "string",
+          "enum": [
+            "not_run",
+            "running",
+            "pass",
+            "warn",
+            "fail",
+            "blocked",
+            "invalid",
+            "stale"
+          ]
+        },
+        "stage_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stage_artifacts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "summary_artifact": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ]
+}

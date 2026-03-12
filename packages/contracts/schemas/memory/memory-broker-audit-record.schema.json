@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/memory/memory-broker-audit-record.schema.json",
+  "title": "MemoryBrokerAuditRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "audit_id",
+    "action",
+    "status",
+    "workspace_id",
+    "source_surface",
+    "result_count",
+    "created_at"
+  ],
+  "properties": {
+    "audit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "opt_in_updated",
+        "read"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "succeeded",
+        "unavailable"
+      ]
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_surface": {
+      "type": "string",
+      "enum": [
+        "web",
+        "pwa",
+        "ios_webview",
+        "android_webview",
+        "telegram"
+      ]
+    },
+    "conversation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "query": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

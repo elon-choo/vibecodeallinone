@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/evidence/evidence-summary.schema.json",
+  "title": "EvidenceSummary",
+  "allOf": [
+    {
+      "$ref": "artifact-metadata.schema.json"
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app_version",
+        "release_channel",
+        "generated_at",
+        "overall_status",
+        "trust_label",
+        "score",
+        "stage_statuses",
+        "highlights",
+        "user_visible_controls",
+        "public_evidence_links"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "const": "evidence_summary"
+        },
+        "app_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_channel": {
+          "type": "string",
+          "enum": [
+            "local",
+            "internal",
+            "beta",
+            "public"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "overall_status": {
+          "type": "string",
+          "enum": [
+            "not_run",
+            "running",
+            "pass",
+            "warn",
+            "fail",
+            "blocked",
+            "invalid",
+            "stale"
+          ]
+        },
+        "trust_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total",
+            "max"
+          ],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "stage_statuses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage_id",
+              "status",
+              "computed_score",
+              "max_score"
+            ],
+            "properties": {
+              "stage_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not_run",
+                  "running",
+                  "pass",
+                  "warn",
+                  "fail",
+                  "blocked",
+                  "invalid",
+                  "stale"
+                ]
+              },
+              "computed_score": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "max_score": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "highlights": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "user_visible_controls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "memory_export_supported",
+            "memory_delete_supported",
+            "latest_change_log_url",
+            "evidence_detail_url"
+          ],
+          "properties": {
+            "memory_export_supported": {
+              "type": "boolean"
+            },
+            "memory_delete_supported": {
+              "type": "boolean"
+            },
+            "latest_change_log_url": {
+              "type": "string"
+            },
+            "evidence_detail_url": {
+              "type": "string"
+            }
+          }
+        },
+        "public_evidence_links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "url"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

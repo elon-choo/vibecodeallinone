@@ -1,0 +1,9 @@
+{
+  "name": "@claude-code-power-pack/evidence-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Release evidence bundle contracts for Ralph Loop",
+  "files": [
+    "schemas"
+  ]
+}

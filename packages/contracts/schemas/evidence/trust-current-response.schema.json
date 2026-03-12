@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/evidence/trust-current-response.schema.json",
+  "title": "TrustCurrentResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "app_version",
+    "evidence_ref",
+    "summary"
+  ],
+  "properties": {
+    "app_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_ref": {
+      "$ref": "evidence-ref.schema.json"
+    },
+    "summary": {
+      "$ref": "../../../evidence-contracts/schemas/evidence-summary.schema.json"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Code Power Pack - Unified Installer
+# Power Pack developer toolkit installer
 # Supports 3 installation tiers
 
 set -e
@@ -14,13 +14,36 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Claude Code Power Pack - Installer${NC}"
+usage() {
+  cat <<'EOF'
+Power Pack Developer Toolkit Installer
+
+Usage:
+  bash scripts/install.sh [1|2|3]
+
+Tiers:
+  1  Install 12 Claude Code skills only
+  2  Install skills + KG MCP server
+  3  Install skills + KG MCP server + hooks
+
+For the assistant runtime self-host reference stack, use:
+  bash scripts/assistant/bootstrap_runtime.sh --target <dir>
+EOF
+}
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  usage
+  exit 0
+fi
+
+echo -e "${BLUE}Claude Code Power Pack - Developer Toolkit Installer${NC}"
 echo "===================================="
 echo ""
 echo "Installation Tiers:"
-echo "  1) Skills Only     - 12 AI skills, zero dependencies ($0/month)"
+echo "  1) Skills Only     - 12 AI skills, zero dependencies (\$0/month)"
 echo "  2) Skills + KG MCP - Adds Knowledge Graph MCP server (Python required)"
 echo "  3) Full            - Adds auto-trigger hooks for seamless KG integration"
+echo "  Runtime stack      - Use scripts/assistant/bootstrap_runtime.sh"
 echo ""
 
 # Default to tier 1 if argument provided, otherwise ask
@@ -29,6 +52,15 @@ if [ "$TIER" = "0" ]; then
   read -p "Select tier (1/2/3) [1]: " TIER
   TIER=${TIER:-1}
 fi
+
+case "$TIER" in
+  1|2|3) ;;
+  *)
+    echo -e "${YELLOW}Invalid tier: $TIER${NC}"
+    usage
+    exit 1
+    ;;
+esac
 
 echo ""
 
@@ -61,6 +93,7 @@ echo ""
 if [ "$TIER" -lt 2 ]; then
   echo "Done! Skills are ready in your Claude Code sessions."
   echo "Try: 'vibe review' or 'vibe init'"
+  echo "Assistant runtime reference stack: bash scripts/assistant/bootstrap_runtime.sh --target <dir>"
   exit 0
 fi
 
@@ -183,3 +216,4 @@ echo "Next steps:"
 echo "  1. Edit ~/.claude/power-pack.env with your credentials"
 echo "  2. Install Neo4j: brew install neo4j && neo4j start"
 echo "  3. Start a Claude Code session and try 'vibe review'"
+echo "  4. For the assistant runtime reference stack, use scripts/assistant/bootstrap_runtime.sh"

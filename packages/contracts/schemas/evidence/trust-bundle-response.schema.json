@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/evidence/trust-bundle-response.schema.json",
+  "title": "TrustBundleResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "summary"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "$ref": "../../../evidence-contracts/schemas/evidence-summary.schema.json"
+    }
+  }
+}

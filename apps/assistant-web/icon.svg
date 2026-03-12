@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Assistant Web">
+  <rect width="96" height="96" rx="28" fill="#0f2a24" />
+  <path
+    d="M20 64c0-20.435 9.825-32 28-32 12.18 0 21.257 4.69 28 13.24V20h8v56H72v-9.68C65.578 74.774 56.943 80 45.16 80 28.718 80 20 70.627 20 64Z"
+    fill="#f2ebdd"
+  />
+  <circle cx="69" cy="27" r="7" fill="#e8612f" />
+</svg>

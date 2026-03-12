@@ -12,13 +12,25 @@ Stages:
 """
 
 import argparse
+import importlib
 import json
 import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+RALPH_LOOP_DIR = Path(__file__).parent
+if str(RALPH_LOOP_DIR) not in sys.path:
+    sys.path.insert(0, str(RALPH_LOOP_DIR))
+
+artifact_io = importlib.import_module("artifact_io")
+atomic_write_json = artifact_io.atomic_write_json
+atomic_write_text = artifact_io.atomic_write_text
+review_score_value = artifact_io.review_score_value
+trust_bundle = importlib.import_module("trust_bundle")
+publish_bundle = trust_bundle.publish_bundle
 
 # ── Constants ──────────────────────────────────────────────
 REPO_ROOT = Path(__file__).parent.parent.parent
@@ -33,7 +45,7 @@ STEPS_DIR = Path(__file__).parent / "steps"
 def gate_g0_env() -> dict:
     """G0: Environment check — Python >= 3.11, bash, git."""
     issues = []
-    if sys.version_info < (3, 11):
+    if sys.version_info < (3, 11):  # noqa: UP036
         issues.append(f"Python {sys.version} < 3.11")
 
     for cmd in ["bash", "git"]:
@@ -56,7 +68,7 @@ def gate_g1_lint() -> dict:
              str(REPO_ROOT / "kg-mcp-server"), str(REPO_ROOT / "hooks")],
             capture_output=True, text=True, timeout=60,
         )
-        errors = [l for l in result.stdout.strip().split("\n") if l.strip()] if result.stdout.strip() else []
+        errors = [line for line in result.stdout.strip().split("\n") if line.strip()] if result.stdout.strip() else []
         return {
             "gate": "G1_lint",
             "severity": "HIGH",
@@ -238,7 +250,7 @@ def load_ai_review_score() -> int:
             continue
         try:
             data = json.loads(review_file.read_text())
-            scores.append(data.get("score", 0))
+            scores.append(review_score_value(data))
         except (json.JSONDecodeError, KeyError):
             continue
 
@@ -311,9 +323,15 @@ def calculate_score(gates: list, release_checks: list) -> dict:
 
 # ── Report Generator ──────────────────────────────────────
 
-def generate_report(gates: list, release_checks: list, score: dict, elapsed: float) -> str:
+def generate_report(
+    gates: list,
+    release_checks: list,
+    score: dict,
+    elapsed: float,
+    bundle_info: dict | None = None,
+) -> str:
     """Generate Markdown report."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     lines = [
         "# Ralph Loop v3 — Health Report",
@@ -322,25 +340,39 @@ def generate_report(gates: list, release_checks: list, score: dict, elapsed: flo
         f"**Elapsed**: {elapsed:.1f}s",
         f"**Health Score**: **{score['total']}/100**",
         "",
-        "---",
-        "",
-        "## Score Breakdown",
-        "",
-        f"| Stage | Score | Max |",
-        f"|-------|-------|-----|",
-        f"| Stage 1: Machine Gates | {score['stage1_gates']} | 30 |",
-        f"| Stage 2: AI Review | {score['stage2_ai_review']} | 30 |",
-        f"| Stage 3: E2E Validation | {score['stage3_e2e']} | 20 |",
-        f"| Stage 4: Release Gate | {score['stage4_release']} | 20 |",
-        f"| **Total** | **{score['total']}** | **100** |",
-        "",
-        "---",
-        "",
-        "## Stage 1: Machine Gates",
-        "",
-        "| Gate | Severity | Status | Issues |",
-        "|------|----------|--------|--------|",
     ]
+
+    if bundle_info:
+        lines.extend(
+            [
+                f"**Bundle ID**: `{bundle_info['bundle_id']}`",
+                f"**Bundle Status**: `{bundle_info['summary']['overall_status']}`",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "---",
+            "",
+            "## Score Breakdown",
+            "",
+            "| Stage | Score | Max |",
+            "|-------|-------|-----|",
+            f"| Stage 1: Machine Gates | {score['stage1_gates']} | 30 |",
+            f"| Stage 2: AI Review | {score['stage2_ai_review']} | 30 |",
+            f"| Stage 3: E2E Validation | {score['stage3_e2e']} | 20 |",
+            f"| Stage 4: Release Gate | {score['stage4_release']} | 20 |",
+            f"| **Total** | **{score['total']}** | **100** |",
+            "",
+            "---",
+            "",
+            "## Stage 1: Machine Gates",
+            "",
+            "| Gate | Severity | Status | Issues |",
+            "|------|----------|--------|--------|",
+        ]
+    )
 
     for g in gates:
         emoji = {"PASS": "PASS", "FAIL": "**FAIL**", "WARN": "WARN"}[g["status"]]
@@ -445,7 +477,7 @@ def main():
               file=sys.stderr)
 
     # Save gates
-    GATES_FILE.write_text(json.dumps(gates, indent=2, ensure_ascii=False))
+    atomic_write_json(GATES_FILE, gates)
 
     critical_fails = [g for g in gates if g["status"] == "FAIL" and g["severity"] == "CRITICAL"]
     if critical_fails:
@@ -469,6 +501,13 @@ def main():
     # ── Score ──
     score = calculate_score(gates, release_checks)
     elapsed = time.time() - start
+    bundle_info = publish_bundle(
+        repo_root=REPO_ROOT,
+        artifacts_dir=ARTIFACTS_DIR,
+        gates=gates,
+        release_checks=release_checks,
+        score=score,
+    )
 
     print(f"\n{'='*40}", file=sys.stderr)
     print(f"  Health Score: {score['total']}/100", file=sys.stderr)
@@ -478,16 +517,17 @@ def main():
     print(f"  Stage 2 (Review):  {score['stage2_ai_review']}/30{s2_note}", file=sys.stderr)
     print(f"  Stage 3 (E2E):     {score['stage3_e2e']}/20{s3_note}", file=sys.stderr)
     print(f"  Stage 4 (Release): {score['stage4_release']}/20", file=sys.stderr)
+    print(f"  Bundle:            {bundle_info['bundle_id']} ({bundle_info['summary']['overall_status']})", file=sys.stderr)
     print(f"  Elapsed: {elapsed:.1f}s", file=sys.stderr)
     print(f"{'='*40}", file=sys.stderr)
 
     # ── Report ──
     if args.json:
-        output = json.dumps({"gates": gates, "release": release_checks, "score": score}, indent=2)
+        output = json.dumps({"gates": gates, "release": release_checks, "score": score, "bundle": bundle_info["summary"]}, indent=2)
         print(output)
     else:
-        report = generate_report(gates, release_checks, score, elapsed)
-        REPORT_FILE.write_text(report)
+        report = generate_report(gates, release_checks, score, elapsed, bundle_info)
+        atomic_write_text(REPORT_FILE, report)
         print(f"\n  Report: {REPORT_FILE}", file=sys.stderr)
 
     # Exit code: 1 if any CRITICAL gate failed

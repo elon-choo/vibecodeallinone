@@ -1,0 +1,434 @@
+openapi: 3.1.0
+info:
+  title: Assistant API
+  version: 0.1.0
+  description: >
+    Contract-first bootstrap for auth, memory, Telegram companion state,
+    continuity checkpoints, opt-in workspace/project memory broker state,
+    auditable jobs, and trust read endpoints. Raw Ralph Loop artifacts are
+    intentionally excluded.
+servers:
+  - url: https://assistant-api.internal
+security:
+  - cookieAuth: []
+paths:
+  /v1/auth/openai/start:
+    post:
+      summary: Start the OpenAI-first auth handshake
+      operationId: startOpenAiAuth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/auth/openai-start-request.schema.json
+      responses:
+        "200":
+          description: Provider redirect metadata
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/auth/openai-start-response.schema.json
+  /v1/auth/openai/callback:
+    get:
+      summary: Complete the OpenAI-first auth callback and return control to assistant-web
+      operationId: completeOpenAiAuth
+      parameters:
+        - in: query
+          name: state
+          required: true
+          schema:
+            type: string
+            minLength: 8
+        - in: query
+          name: code
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: error
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: error_description
+          required: false
+          schema:
+            type: string
+      responses:
+        "303":
+          description: Browser redirect back to `assistant-web`
+        "400":
+          description: Invalid or expired auth callback state
+  /v1/auth/session:
+    get:
+      summary: Resolve the current first-party session
+      operationId: getAuthSession
+      responses:
+        "200":
+          description: Active session
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/auth/auth-session.schema.json
+  /v1/surfaces/telegram/link:
+    get:
+      summary: Resolve the Telegram companion link state for the current user
+      operationId: getTelegramLinkState
+      responses:
+        "200":
+          description: Telegram link state
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/telegram/telegram-link-state.schema.json
+    post:
+      summary: Issue or refresh a short-lived Telegram link state
+      operationId: startTelegramLink
+      responses:
+        "200":
+          description: Pending or active Telegram link state
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/telegram/telegram-link-state.schema.json
+  /v1/memory/items:
+    get:
+      summary: List memory items visible to the current user
+      operationId: listMemoryItems
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [candidate, active, archived, deleted]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Memory items
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../schemas/memory/memory-record.schema.json
+    post:
+      summary: Create or explicitly save a memory item
+      operationId: createMemoryItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/memory/memory-create-request.schema.json
+      responses:
+        "201":
+          description: Created memory item
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-record.schema.json
+  /v1/memory/broker/workspaces:
+    get:
+      summary: List opted-in workspace/project memory broker scopes for the current user
+      operationId: listMemoryBrokerWorkspaces
+      responses:
+        "200":
+          description: Workspace broker states
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-broker-workspace-list-response.schema.json
+  /v1/memory/broker/workspaces/{workspaceId}:
+    get:
+      summary: Resolve the broker opt-in state for a workspace
+      operationId: getMemoryBrokerWorkspace
+      parameters:
+        - in: path
+          name: workspaceId
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Workspace broker state
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-broker-workspace-state.schema.json
+    put:
+      summary: Upsert the explicit opt-in state for a workspace-scoped memory broker
+      operationId: putMemoryBrokerWorkspace
+      parameters:
+        - in: path
+          name: workspaceId
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/memory/memory-broker-workspace-upsert-request.schema.json
+      responses:
+        "200":
+          description: Updated workspace broker state
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-broker-workspace-state.schema.json
+  /v1/memory/broker/workspaces/{workspaceId}/query:
+    post:
+      summary: Query opt-in workspace/project memory through the additive broker path
+      operationId: queryMemoryBrokerWorkspace
+      parameters:
+        - in: path
+          name: workspaceId
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/memory/memory-broker-query-request.schema.json
+      responses:
+        "200":
+          description: Workspace/project memory broker response
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-broker-query-response.schema.json
+        "400":
+          description: Workspace broker not enabled, outside scope, or unavailable for raw Telegram retrieval
+  /v1/memory/exports:
+    post:
+      summary: Generate a memory export bundle with provenance and revision history
+      operationId: exportMemoryItems
+      responses:
+        "200":
+          description: Memory export bundle
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-export-response.schema.json
+  /v1/memory/items/{memoryId}:
+    patch:
+      summary: Update memory content, status, or importance
+      operationId: patchMemoryItem
+      parameters:
+        - in: path
+          name: memoryId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                content:
+                  type: string
+                status:
+                  type: string
+                  enum: [candidate, active, archived, deleted]
+                importance:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+      responses:
+        "200":
+          description: Updated memory item
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-record.schema.json
+    delete:
+      summary: Remove a memory item from the retrieval set and queue purge
+      operationId: deleteMemoryItem
+      parameters:
+        - in: path
+          name: memoryId
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Delete accepted and purge queued
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/memory/memory-delete-receipt.schema.json
+  /v1/checkpoints/current:
+    get:
+      summary: Read the latest checkpoint for the current device or conversation
+      operationId: getCurrentCheckpoint
+      responses:
+        "200":
+          description: Current checkpoint
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/checkpoint/session-checkpoint.schema.json
+    put:
+      summary: Upsert the current cross-device checkpoint
+      operationId: putCurrentCheckpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/checkpoint/checkpoint-upsert-request.schema.json
+      responses:
+        "200":
+          description: Stored checkpoint
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/checkpoint/session-checkpoint.schema.json
+        "409":
+          description: Local draft conflicts with a newer server checkpoint
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/checkpoint/checkpoint-conflict-response.schema.json
+  /v1/reminders:
+    get:
+      summary: List reminder deliveries for the current user
+      operationId: listReminderDeliveries
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [scheduled, delivered, canceled, failed]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Reminder deliveries
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/reminders/reminder-list-response.schema.json
+    post:
+      summary: Schedule a Telegram reminder delivery for the current user with optional follow-up policy
+      operationId: createReminderDelivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../schemas/reminders/reminder-create-request.schema.json
+      responses:
+        "201":
+          description: Scheduled reminder delivery
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/reminders/reminder-record.schema.json
+  /v1/reminders/{reminderId}:
+    delete:
+      summary: Cancel a scheduled reminder delivery
+      operationId: cancelReminderDelivery
+      parameters:
+        - in: path
+          name: reminderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Canceled reminder delivery
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/reminders/reminder-record.schema.json
+        "404":
+          description: Reminder not found
+        "409":
+          description: Reminder can no longer be canceled
+  /v1/jobs:
+    get:
+      summary: List recent auditable runtime jobs for the current user
+      operationId: listRuntimeJobs
+      parameters:
+        - in: query
+          name: kind
+          schema:
+            type: string
+            enum: [memory_export, memory_delete, reminder_delivery]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, canceled]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Auditable runtime jobs
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/jobs/runtime-jobs-response.schema.json
+  /v1/trust/current:
+    get:
+      summary: Resolve the public trust summary for the deployed app version
+      operationId: getCurrentTrust
+      responses:
+        "200":
+          description: Current trust summary
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/evidence/trust-current-response.schema.json
+  /v1/trust/bundles/{bundleId}:
+    get:
+      summary: Resolve a public trust summary for a bundle
+      operationId: getTrustBundle
+      parameters:
+        - in: path
+          name: bundleId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bundle trust summary
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/evidence/trust-bundle-response.schema.json
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: assistant_session

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/contracts/telegram/telegram-link-state.schema.json",
+  "title": "TelegramLinkState",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "surface",
+    "status",
+    "is_linked",
+    "link_code",
+    "bot_deep_link",
+    "expires_at",
+    "telegram_display_name",
+    "telegram_username",
+    "linked_at",
+    "last_event_at",
+    "last_error_code",
+    "last_error_message",
+    "last_resume_token_ref"
+  ],
+  "properties": {
+    "surface": {
+      "type": "string",
+      "const": "telegram"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "not_linked",
+        "pending",
+        "linked",
+        "error"
+      ]
+    },
+    "is_linked": {
+      "type": "boolean"
+    },
+    "link_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bot_deep_link": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "telegram_display_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "telegram_username": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "linked_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_event_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_error_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_error_message": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_resume_token_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-code-power-pack.local/evidence/artifact-metadata.schema.json",
+  "title": "ArtifactMetadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_kind",
+    "artifact_id",
+    "bundle_id",
+    "run_id",
+    "git_commit",
+    "git_tree_state",
+    "inputs_hash",
+    "content_hash",
+    "created_at",
+    "producer",
+    "visibility",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_kind": {
+      "type": "string",
+      "enum": [
+        "stage_result",
+        "bundle_manifest",
+        "evidence_summary",
+        "history_event"
+      ]
+    },
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "git_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "git_tree_state": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "dirty",
+        "unknown"
+      ]
+    },
+    "inputs_hash": {
+      "type": "string",
+      "pattern": "^sha256:"
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^sha256:"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "internal",
+        "operator",
+        "public_summary"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "not_run",
+        "running",
+        "pass",
+        "warn",
+        "fail",
+        "blocked",
+        "invalid",
+        "stale"
+      ]
+    }
+  }
+}
